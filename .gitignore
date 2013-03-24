@@ -1,0 +1,17 @@
+Makefile
+Makefile.in
+aclocal.m4
+autom4te.cache
+autoscan.log
+configure
+depcomp
+install-sh
+missing
+*.o
+.deps
+config.h
+config.h.in
+config.log
+config.status
+stamp-h1
+src/mblogger

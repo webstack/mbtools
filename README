@@ -1,0 +1,11 @@
+Requirements
+============
+
+automake libtool pkg-config libglib2.0-dev libmodbus
+
+Installation
+============
+
+./autogen.sh
+./configure
+make

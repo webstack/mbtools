@@ -11,7 +11,7 @@
 #define RECV_MAX 256
 #define SOCK_PATH "/tmp/mbsocket"
 
-int stop = 0;
+static volatile int stop = 0;
 
 static void sigint_stop(int dummy)
 {

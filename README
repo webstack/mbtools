@@ -1,3 +1,9 @@
+Description
+===========
+
+Modbus tools based on libmodbus to log data fetched by a master
+or received by a slave (writing of registers).
+
 Requirements
 ============
 

@@ -2,6 +2,7 @@
 #include <glib.h>
 #include "keyfile.h"
 
+/* Parse config file (.ini-like file) */
 client_t* keyfile_parse(option_t *opt, int *nb_client)
 {
     int i;
@@ -10,47 +11,59 @@ client_t* keyfile_parse(option_t *opt, int *nb_client)
 
     *nb_client = 0;
 
-    /* Parse config file */
     if (opt->ini_file == NULL) {
         return NULL;
     }
 
     if (opt->verbose)
-        g_print("Load %s config file.\n", opt->ini_file);
+        g_print("Loading of %s config file.\n", opt->ini_file);
 
     key_file = g_key_file_new();
-    if (g_key_file_load_from_file(key_file, opt->ini_file, G_KEY_FILE_NONE, NULL)) {
-        gchar** groups;
 
-        if (opt->device == NULL)
-            opt->device = g_key_file_get_string(key_file, "settings", "device", NULL);
+    if (!g_key_file_load_from_file(key_file, opt->ini_file, G_KEY_FILE_NONE, NULL)) {
+        g_key_file_free(key_file);
+        return NULL;
+    }
 
-        if (opt->baud == -1) {
-            opt->baud = g_key_file_get_integer(key_file, "settings", "baud", NULL);
-            if (opt->baud == 0)
-                opt->baud = -1;
-        }
+    if (opt->listen == FALSE) {
+        opt->listen = g_key_file_get_boolean(key_file, "settings", "listen", NULL);
+    }
 
-        if (opt->parity == NULL)
-            opt->parity = g_key_file_get_string(key_file, "settings", "parity", NULL);
+    if (opt->id == -1) {
+        opt->id = g_key_file_get_integer(key_file, "settings", "id", NULL);
+        if (opt->id == 0)
+            opt->id = -1;
+    }
 
-        if (opt->data_bit == -1) {
-            opt->data_bit = g_key_file_get_integer(key_file, "settings", "databit", NULL);
-            if (opt->data_bit == 0)
-                opt->data_bit = -1;
-        }
+    if (opt->device == NULL)
+        opt->device = g_key_file_get_string(key_file, "settings", "device", NULL);
 
-        if (opt->stop_bit == -1) {
-            opt->stop_bit = g_key_file_get_integer(key_file, "settings", "stopbit", NULL);
-            if (opt->stop_bit == 0)
-                opt->stop_bit = -1;
-        }
+    if (opt->baud == -1) {
+        opt->baud = g_key_file_get_integer(key_file, "settings", "baud", NULL);
+        if (opt->baud == 0)
+            opt->baud = -1;
+    }
 
-        if (opt->socket_file == NULL)
-            opt->socket_file = g_key_file_get_string(key_file, "settings", "socketfile", NULL);
+    if (opt->parity == NULL)
+        opt->parity = g_key_file_get_string(key_file, "settings", "parity", NULL);
 
-        /* Fetch list of groups */
-        groups = g_key_file_get_groups(key_file, NULL);
+    if (opt->data_bit == -1) {
+        opt->data_bit = g_key_file_get_integer(key_file, "settings", "databit", NULL);
+        if (opt->data_bit == 0)
+            opt->data_bit = -1;
+    }
+
+    if (opt->stop_bit == -1) {
+        opt->stop_bit = g_key_file_get_integer(key_file, "settings", "stopbit", NULL);
+        if (opt->stop_bit == 0)
+            opt->stop_bit = -1;
+    }
+
+    if (opt->socket_file == NULL)
+        opt->socket_file = g_key_file_get_string(key_file, "settings", "socketfile", NULL);
+
+    if (!opt->listen) {
+        gchar** groups = g_key_file_get_groups(key_file, NULL);
 
         /* Count [slave] sections to allocate clients */
         i = 0;
@@ -98,6 +111,7 @@ client_t* keyfile_parse(option_t *opt, int *nb_client)
         }
         g_strfreev(groups);
     }
+
     g_key_file_free(key_file);
 
     return clients;

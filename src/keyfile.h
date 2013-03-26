@@ -5,6 +5,9 @@
 #include <modbus.h>
 #include "option.h"
 
+#define MBT_LOCAL_INI_FILE "mbcollect.ini"
+#define MBT_ETC_INI_FILE ("/etc/" MBT_LOCAL_INI_FILE)
+
 typedef struct {
     modbus_t *ctx;
     int id;

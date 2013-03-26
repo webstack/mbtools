@@ -19,7 +19,10 @@ int output_write(int s, int slave_id, int addr, int nb_reg, uint16_t *tab_reg)
     char **out_array = g_new(char*, nb_reg + 1);
 
     for (i = 0; i < nb_reg; i++) {
-        out_array[i] = g_strdup_printf("mb_%d_%d %d", slave_id, addr + i, tab_reg[i]);
+        if (slave_id > 0)
+            out_array[i] = g_strdup_printf("mb_%d_%d %d", slave_id, addr + i, tab_reg[i]);
+        else
+            out_array[i] = g_strdup_printf("mb_%d %d", addr + i, tab_reg[i]);
     }
     out_array[i] = NULL;
     output = g_strjoinv("|", out_array);
@@ -47,7 +50,7 @@ int output_connect(char* socket_file, gboolean verbose)
     }
 
     if (verbose)
-        g_print("Trying to connect to recorder...\n");
+        g_print("Trying to connect to recorder socket %s\n", socket_file);
 
     remote.sun_family = AF_UNIX;
     strcpy(remote.sun_path, socket_file);

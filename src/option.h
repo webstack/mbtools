@@ -4,6 +4,8 @@
 #include <glib.h>
 
 typedef struct {
+    gboolean listen;
+    int id;
     /* RTU */
     char *device;
     int baud;

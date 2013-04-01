@@ -22,6 +22,12 @@
 
 static volatile gboolean stop = FALSE;
 
+static void sigint_stop(int dummy)
+{
+    /* Stop the main process */
+    stop = TRUE;
+}
+
 int collect_listen(modbus_t *ctx, option_t *opt)
 {
     modbus_mapping_t *mb_mapping = NULL;
@@ -49,7 +55,7 @@ int collect_listen(modbus_t *ctx, option_t *opt)
                 /* Write to local unix socket */
                 g_print("Addr %d: %d values\n", addr, nb);
                 while ((output_write(s, -1, addr, nb, mb_mapping->tab_registers + addr) == -1) && !stop) {
-                    sleep(1);
+                    usleep(1000000);
                     output_close(s);
                     output_connect(opt->socket_file, opt->verbose);
                 }
@@ -65,6 +71,7 @@ int collect_listen(modbus_t *ctx, option_t *opt)
 
 void collect_poll(modbus_t *ctx, option_t *opt, client_t *clients, int nb_client)
 {
+    int rc;
     int i;
     int n;
     uint16_t tab_reg[MODBUS_MAX_READ_REGISTERS];
@@ -82,7 +89,10 @@ void collect_poll(modbus_t *ctx, option_t *opt, client_t *clients, int nb_client
             g_print("Going to sleep for %d seconds...\n", delta);
         }
 
-        sleep(delta);
+        rc = usleep(delta * 1000000);
+        if (rc == -1) {
+            g_warning("usleep has been interrupted\n");
+        }
 
         if (opt->verbose) {
             g_print("Wake up: ");
@@ -110,7 +120,7 @@ void collect_poll(modbus_t *ctx, option_t *opt, client_t *clients, int nb_client
                 } else {
                     /* Write to local unix socket */
                     while ((output_write(s, client->id, client->addresses[n], nb_reg, tab_reg) == -1) && !stop) {
-                        sleep(1);
+                        usleep(1000000);
                         output_close(s);
                         output_connect(opt->socket_file, opt->verbose);
                     }
@@ -119,12 +129,6 @@ void collect_poll(modbus_t *ctx, option_t *opt, client_t *clients, int nb_client
         }
     }
     output_close(s);
-}
-
-static void sigint_stop(int dummy)
-{
-    /* Stop the main process */
-    stop = TRUE;
 }
 
 int main(int argc, char *argv[])

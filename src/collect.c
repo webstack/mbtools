@@ -67,7 +67,7 @@ int collect_listen(modbus_t *ctx, option_t *opt)
                 while ((output_write(s, -1, addr, nb, mb_mapping->tab_registers + addr) == -1) && !stop) {
                     usleep(1000000);
                     output_close(s);
-                    output_connect(opt->socket_file, opt->verbose);
+                    s = output_connect(opt->socket_file, opt->verbose);
                 }
             }
         }
@@ -135,7 +135,7 @@ void collect_poll(modbus_t *ctx, option_t *opt, client_t *clients, int nb_client
                     while ((output_write(s, client->id, client->addresses[n], nb_reg, tab_reg) == -1) && !stop) {
                         usleep(1000000);
                         output_close(s);
-                        output_connect(opt->socket_file, opt->verbose);
+                        s = output_connect(opt->socket_file, opt->verbose);
                     }
                 }
             }

@@ -7,5 +7,6 @@
 int output_connect(char* socket_file, gboolean verbose);
 void output_close(int s);
 int output_write(int s, int slave_id, int addr, int nb_reg, uint16_t *tab_reg);
+gboolean output_is_connected(int s);
 
 #endif /* _OUTPUT_H_ */

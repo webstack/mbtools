@@ -37,9 +37,12 @@ void option_free(option_t *opt)
     g_slice_free(option_t, opt);
 }
 
-void option_parse(option_t* opt, gint *argc, gchar ***argv)
+void option_parse(option_t* opt, int argc, char **argv)
 {
+    int i;
     int rc;
+    int argc_copy;
+    gchar **argv_copy = NULL;
 
     GOptionContext *context;
     GError *error = NULL;
@@ -62,11 +65,21 @@ void option_parse(option_t* opt, gint *argc, gchar ***argv)
         {NULL}
     };
 
+    /* Make an extra copy of argv, since g_option_context_parse()
+     * changes them and they are required on reload */
+    argc_copy = argc;
+    argv_copy = g_new(gchar*, argc + 1);
+    for (i = 0; i <= argc; i++) {
+        argv_copy[i] = argv[i];
+    }
+
     context = g_option_context_new("- Modbus data collector");
     g_option_context_add_main_entries(context, entries, PACKAGE_NAME);
     /* Config file settings are overrided by command line options */
-    rc = g_option_context_parse(context, argc, argv, &error);
+    rc = g_option_context_parse(context, &argc_copy, &argv_copy, &error);
     g_option_context_free(context);
+
+    g_free(argv_copy);
 
     if (rc == FALSE) {
         g_error("option parsing failed: %s\n", error->message);

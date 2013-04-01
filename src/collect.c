@@ -72,7 +72,9 @@ int collect_listen(modbus_t *ctx, option_t *opt)
                 if (output_is_connected(s)) {
                     if (output_write(s, -1, addr, nb, mb_mapping->tab_registers + addr, opt->verbose) == -1) {
                         output_close(s);
+                        s = -1;
                     }
+                  }
                 }
             }
         }
@@ -144,6 +146,7 @@ void collect_poll(modbus_t *ctx, option_t *opt, client_t *clients, int nb_client
                     if (output_is_connected(s)) {
                         if (output_write(s, client->id, client->addresses[n], nb_reg, tab_reg, opt->verbose) == -1) {
                             output_close(s);
+                            s = -1;
                         }
                     }
                 }

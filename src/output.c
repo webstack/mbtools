@@ -26,7 +26,8 @@ int output_write(int s, int slave_id, int addr, int nb_reg, uint16_t *tab_reg)
     }
     out_array[i] = NULL;
     output = g_strjoinv("|", out_array);
-    g_print("%s\n", output);
+    if (verbose)
+      g_print("%s\n", output);
     rc = send(s, output, strlen(output), MSG_NOSIGNAL);
 
     for (i = 0; i < nb_reg; i++) {

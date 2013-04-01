@@ -71,3 +71,8 @@ void output_close(int s)
 {
     close(s);
 }
+
+gboolean output_is_connected(int s)
+{
+  return s > 0 ? TRUE : FALSE;
+}

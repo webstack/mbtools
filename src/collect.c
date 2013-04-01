@@ -26,7 +26,7 @@ int collect_listen(modbus_t *ctx, option_t *opt)
 {
     modbus_mapping_t *mb_mapping = NULL;
     uint8_t query[MODBUS_RTU_MAX_ADU_LENGTH];
-    int s = output_connect(opt->socket_file, opt->verbose);
+    int s = 0;
     int header_length = modbus_get_header_length(ctx);
 
     mb_mapping = modbus_mapping_new(BITS_NB, INPUT_BITS_NB, REGISTERS_NB, INPUT_REGISTERS_NB);
@@ -50,10 +50,15 @@ int collect_listen(modbus_t *ctx, option_t *opt)
                 if (opt->verbose)
                   g_print("Addr %d: %d values\n", addr, nb);
                 
-                while ((output_write(s, -1, addr, nb, mb_mapping->tab_registers + addr) == -1) && !stop) {
-                    sleep(1);
+                if (!output_is_connected(s))
+                  s = output_connect(opt->socket_file, opt->verbose);
+                
+                if (output_is_connected(s))
+                {
+                  if (output_write(s, -1, addr, nb, mb_mapping->tab_registers + addr) == -1)
+                  {
                     output_close(s);
-                    s = output_connect(opt->socket_file, opt->verbose);
+                  }
                 }
             }
         }
@@ -71,7 +76,7 @@ void collect_poll(modbus_t *ctx, option_t *opt, client_t *clients, int nb_client
     int n;
     uint16_t tab_reg[MODBUS_MAX_READ_REGISTERS];
     /* Local unix socket to output */
-    int s = output_connect(opt->socket_file, opt->verbose);
+    int s = 0;
 
     while (!stop) {
         GTimeVal tv;
@@ -111,10 +116,15 @@ void collect_poll(modbus_t *ctx, option_t *opt, client_t *clients, int nb_client
                               modbus_strerror(errno));
                 } else {
                     /* Write to local unix socket */
-                    while ((output_write(s, client->id, client->addresses[n], nb_reg, tab_reg) == -1) && !stop) {
-                        sleep(1);
+                    if (!output_is_connected(s))
+                      s = output_connect(opt->socket_file, opt->verbose);
+                    
+                    if (output_is_connected(s))
+                    {
+                      if (output_write(s, client->id, client->addresses[n], nb_reg, tab_reg) == -1)
+                      {
                         output_close(s);
-                        s = output_connect(opt->socket_file, opt->verbose);
+                      }
                     }
                 }
             }

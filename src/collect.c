@@ -103,9 +103,12 @@ void collect_poll(modbus_t *ctx, option_t *opt, client_t *clients, int nb_client
         for (i = 0; i < nb_client; i++) {
             client_t *client = &(clients[i]);
 
-            if (client->id > 0) {
-                modbus_set_slave(ctx, client->id);
+            rc = modbus_set_slave(ctx, client->id);
+            if (rc != 0) {
+                g_warning("modbus_set_slave with ID %d: %s\n", client->id, modbus_strerror(errno));
+                continue;
             }
+
             for (n = 0; n < client->n; n++) {
                 int nb_reg;
 

@@ -63,7 +63,9 @@ int collect_listen(modbus_t *ctx, option_t *opt)
                     nb = MODBUS_GET_INT16_FROM_INT8(query, header_length + 3);
 
                 /* Write to local unix socket */
-                g_print("Addr %d: %d values\n", addr, nb);
+                if (opt->verbose)
+                  g_print("Addr %d: %d values\n", addr, nb);
+                
                 while ((output_write(s, -1, addr, nb, mb_mapping->tab_registers + addr) == -1) && !stop) {
                     usleep(1000000);
                     output_close(s);

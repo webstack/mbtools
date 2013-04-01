@@ -10,7 +10,7 @@
 
 #include "output.h"
 
-int output_write(int s, int slave_id, int addr, int nb_reg, uint16_t *tab_reg)
+int output_write(int s, int slave_id, int addr, int nb_reg, uint16_t *tab_reg, gboolean verbose)
 {
     int rc;
     int i;

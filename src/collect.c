@@ -21,11 +21,18 @@
 #define INPUT_REGISTERS_NB 0
 
 static volatile gboolean stop = FALSE;
+static volatile gboolean reload = FALSE;
 
 static void sigint_stop(int dummy)
 {
     /* Stop the main process */
     stop = TRUE;
+}
+
+static void sighup_reload(int dummy)
+{
+    stop = TRUE;
+    reload = TRUE;
 }
 
 int collect_listen(modbus_t *ctx, option_t *opt)
@@ -142,9 +149,11 @@ int main(int argc, char *argv[])
     client_t *clients = NULL;
     modbus_t *ctx = NULL;
 
+reload:
+
     /* Parse command line options */
     opt = option_new();
-    option_parse(opt, &argc, &argv);
+    option_parse(opt, argc, argv);
 
     /* Parse .ini file */
     clients = keyfile_parse(opt, &nb_client);
@@ -169,6 +178,7 @@ int main(int argc, char *argv[])
 
     /* Signal */
     signal(SIGINT, sigint_stop);
+    signal(SIGHUP, sighup_reload);
 
     ctx = modbus_new_rtu(opt->device, opt->baud, opt->parity[0], opt->data_bit, opt->stop_bit);
     if (ctx == NULL) {
@@ -202,7 +212,14 @@ quit:
     keyfile_client_free(nb_client, clients);
     option_free(opt);
 
-    g_print("mbcollect is stopped.\n");
+    if (reload) {
+        stop = FALSE;
+        reload = FALSE;
+        g_print("Reloading of mbcollect\n");
+        goto reload;
+    }
+
+    g_print("mbcollect has been stopped.\n");
 
     return rc;
 }

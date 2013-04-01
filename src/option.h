@@ -24,7 +24,7 @@ typedef struct {
 
 option_t* option_new(void);
 void option_free(option_t *opt);
-void option_parse(option_t *opt, gint *argc, gchar ***argv);
+void option_parse(option_t *opt, int argc, char **argv);
 int option_set_undefined(option_t *opt);
 
 #endif /* _OPTION_H_ */

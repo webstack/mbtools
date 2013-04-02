@@ -2,6 +2,8 @@
 #include <glib.h>
 #include "keyfile.h"
 
+static gboolean keyfile_set_integer(GKeyFile *key_file, const gchar *group_name, const gchar *key, int *value);
+
 /* Parse config file (.ini-like file) */
 client_t* keyfile_parse(option_t *opt, int *nb_client)
 {
@@ -20,47 +22,40 @@ client_t* keyfile_parse(option_t *opt, int *nb_client)
 
     key_file = g_key_file_new();
 
+
     if (!g_key_file_load_from_file(key_file, opt->ini_file, G_KEY_FILE_NONE, NULL)) {
         g_key_file_free(key_file);
         return NULL;
     }
 
-    if (opt->listen == FALSE) {
+    if (opt->listen == FALSE)
         opt->listen = g_key_file_get_boolean(key_file, "settings", "listen", NULL);
-    }
 
-    if (opt->id == -1) {
-        opt->id = g_key_file_get_integer(key_file, "settings", "id", NULL);
-        if (opt->id == 0)
-            opt->id = -1;
-    }
+    keyfile_set_integer(key_file, "settings", "id", &(opt->id));
 
     if (opt->device == NULL)
         opt->device = g_key_file_get_string(key_file, "settings", "device", NULL);
 
-    if (opt->baud == -1) {
-        opt->baud = g_key_file_get_integer(key_file, "settings", "baud", NULL);
-        if (opt->baud == 0)
-            opt->baud = -1;
-    }
+    keyfile_set_integer(key_file, "settings", "baud", &(opt->baud));
 
     if (opt->parity == NULL)
         opt->parity = g_key_file_get_string(key_file, "settings", "parity", NULL);
 
-    if (opt->data_bit == -1) {
-        opt->data_bit = g_key_file_get_integer(key_file, "settings", "databit", NULL);
-        if (opt->data_bit == 0)
-            opt->data_bit = -1;
-    }
-
-    if (opt->stop_bit == -1) {
-        opt->stop_bit = g_key_file_get_integer(key_file, "settings", "stopbit", NULL);
-        if (opt->stop_bit == 0)
-            opt->stop_bit = -1;
-    }
+    keyfile_set_integer(key_file, "settings", "databit", &(opt->data_bit));
+    keyfile_set_integer(key_file, "settings", "stopbit", &(opt->stop_bit));
+    keyfile_set_integer(key_file, "settings", "interval", &(opt->interval));
 
     if (opt->socket_file == NULL)
         opt->socket_file = g_key_file_get_string(key_file, "settings", "socketfile", NULL);
+
+    if (opt->daemon == FALSE)
+        opt->daemon = g_key_file_get_boolean(key_file, "settings", "daemon", NULL);
+
+    if (opt->pid_file == NULL)
+        opt->pid_file = g_key_file_get_string(key_file, "settings", "pidfile", NULL);
+
+    if (opt->verbose == FALSE)
+        opt->verbose = g_key_file_get_boolean(key_file, "settings", "verbose", NULL);
 
     if (!opt->listen) {
         gchar** groups = g_key_file_get_groups(key_file, NULL);
@@ -128,4 +123,24 @@ void keyfile_client_free(int nb_client, client_t* clients)
         }
         g_slice_free1(sizeof(client_t) * nb_client, clients);
     }
+}
+
+
+/* Set value from config file if defined and not already set by command line.
+   Returns TRUE when value is modified, FALSE otherwise.
+ */
+static gboolean keyfile_set_integer(GKeyFile *key_file, const gchar *group_name, const gchar *key, int *value)
+{
+    /* Don't override command line option */
+    if (*value == -1) {
+        *value = g_key_file_get_integer(key_file, group_name, key, NULL);
+        if (*value == 0) {
+            *value = -1;
+            return FALSE;
+        } else {
+            return TRUE;
+        }
+
+    }
+    return FALSE;
 }

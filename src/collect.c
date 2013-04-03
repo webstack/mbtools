@@ -206,7 +206,7 @@ reload:
         goto quit;
     }
 
-    if (opt->listen) {
+    if (opt->mode == OPT_MODE_SLAVE) {
         if (opt->verbose) {
             g_print("Running in slave mode\n");
         }

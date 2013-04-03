@@ -27,8 +27,11 @@ client_t* keyfile_parse(option_t *opt, int *nb_client)
         return NULL;
     }
 
-    if (opt->listen == FALSE)
-        opt->listen = g_key_file_get_boolean(key_file, "settings", "listen", NULL);
+    if (opt->mode == OPT_MODE_UNDEFINED) {
+        char *mode_string = g_key_file_get_string(key_file, "settings", "mode", NULL);
+        opt->mode = option_parse_mode(mode_string);
+        g_free(mode_string);
+    }
 
     keyfile_set_integer(key_file, "settings", "id", &(opt->id));
 
@@ -56,7 +59,7 @@ client_t* keyfile_parse(option_t *opt, int *nb_client)
     if (opt->verbose == FALSE)
         opt->verbose = g_key_file_get_boolean(key_file, "settings", "verbose", NULL);
 
-    if (!opt->listen) {
+    if (opt->mode == OPT_MODE_MASTER) {
         gchar** groups = g_key_file_get_groups(key_file, NULL);
 
         /* Count [slave] sections to allocate clients */

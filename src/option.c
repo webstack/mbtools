@@ -1,5 +1,5 @@
+#include <string.h>
 #include <glib.h>
-
 #include <config.h>
 #include "option.h"
 #include "keyfile.h"
@@ -10,7 +10,7 @@ option_t* option_new(void)
     opt = g_slice_new(option_t);
 
     /* Initialize */
-    opt->listen = FALSE;
+    opt->mode = OPT_MODE_UNDEFINED;
     opt->id = -1;
     opt->device = NULL;
     opt->baud = -1;
@@ -43,11 +43,12 @@ void option_parse(option_t* opt, int argc, char **argv)
     int rc;
     int argc_copy;
     gchar **argv_copy = NULL;
+    char *mode_string = NULL;
 
     GOptionContext *context;
     GError *error = NULL;
     GOptionEntry entries[] = {
-        {"listen", 'l', 0, G_OPTION_ARG_NONE, &(opt->listen), "Run in slave mode", NULL},
+        {"mode", 'm', 0, G_OPTION_ARG_STRING, &mode_string, "Run in 'master' (default) or 'slave' mode", NULL},
         {"id", 0, 0, G_OPTION_ARG_INT, &(opt->id), "Slave ID in slave mode", "1"},
         {"device", 0, 0, G_OPTION_ARG_FILENAME, &(opt->device), "Device (eg. /dev/ttyUSB0)", NULL},
         {"baud", 'b', 0, G_OPTION_ARG_INT, &(opt->baud), "Baud", "115200"},
@@ -78,12 +79,14 @@ void option_parse(option_t* opt, int argc, char **argv)
     /* Config file settings are overrided by command line options */
     rc = g_option_context_parse(context, &argc_copy, &argv_copy, &error);
     g_option_context_free(context);
-
     g_free(argv_copy);
 
     if (rc == FALSE) {
         g_error("option parsing failed: %s\n", error->message);
     }
+
+    opt->mode = option_parse_mode(mode_string);
+    g_free(mode_string);
 
     if (opt->ini_file == NULL) {
         /* Check existing config file (.ini-like config files) */
@@ -95,9 +98,25 @@ void option_parse(option_t* opt, int argc, char **argv)
     }
 }
 
+opt_mode_t option_parse_mode(char *mode_string) {
+    if (mode_string == NULL)
+        return OPT_MODE_UNDEFINED;
+
+    if (strcmp(mode_string, "master") == 0)
+        return OPT_MODE_MASTER;
+
+    if (strcmp(mode_string, "slave") == 0)
+        return OPT_MODE_SLAVE;
+
+    g_error("invalid mode '%s'", mode_string);
+}
+
 int option_set_undefined(option_t *opt)
 {
     /* Set the default values */
+    if (opt->mode == OPT_MODE_UNDEFINED)
+        opt->mode = OPT_MODE_MASTER;
+
     if (opt->id == -1)
         opt->id = 1;
 

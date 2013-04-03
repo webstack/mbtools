@@ -54,10 +54,13 @@ int collect_listen(modbus_t *ctx, option_t *opt)
         rc = modbus_receive(ctx, query);
         if (rc > 0) {
             modbus_reply(ctx, query, rc, mb_mapping);
-            /* Write multiple registers */
-            if (query[header_length] == 0x10) {
+            /* Write multiple registers and single register */
+            if (query[header_length] == 0x10 || query[header_length] == 0x6) {
                 int addr = MODBUS_GET_INT16_FROM_INT8(query, header_length + 1);
-                int nb = MODBUS_GET_INT16_FROM_INT8(query, header_length + 3);
+                int nb = 1;
+
+                if (query[header_length] == 0x10)
+                    nb = MODBUS_GET_INT16_FROM_INT8(query, header_length + 3);
 
                 /* Write to local unix socket */
                 g_print("Addr %d: %d values\n", addr, nb);

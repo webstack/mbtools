@@ -22,7 +22,6 @@ client_t* keyfile_parse(option_t *opt, int *nb_client)
 
     key_file = g_key_file_new();
 
-
     if (!g_key_file_load_from_file(key_file, opt->ini_file, G_KEY_FILE_NONE, NULL)) {
         g_key_file_free(key_file);
         return NULL;

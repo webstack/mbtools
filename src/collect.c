@@ -74,7 +74,6 @@ int collect_listen(modbus_t *ctx, option_t *opt)
                         output_close(s);
                         s = -1;
                     }
-                  }
                 }
             }
         }

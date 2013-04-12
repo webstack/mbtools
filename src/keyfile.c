@@ -82,6 +82,7 @@ client_t* keyfile_parse(option_t *opt, int *nb_client)
                 if ((strncmp(groups[i], "slave", 5) == 0)) {
                     gsize n_address;
                     gsize n_length;
+                    gsize n_types;
 
                     /* Returns 0 if not found */
                     clients[c].id = g_key_file_get_integer(key_file, groups[i], "id", NULL);
@@ -89,16 +90,29 @@ client_t* keyfile_parse(option_t *opt, int *nb_client)
                                                                        &n_address, NULL);
                     clients[c].lengths = g_key_file_get_integer_list(key_file, groups[i], "lengths",
                                                                      &n_length, NULL);
-                    /* Minimum of both list to be sure each address is associated to a length */
-                    clients[c].n = MIN(n_address, n_length);
+                    /* Types are optional (integer by default) but it's all or nothing */
+                    clients[c].types = g_key_file_get_string_list(key_file, groups[i], "types", &n_types, NULL);
 
+                    /* Check list to be sure each address is associated to a length */
+                    if (n_address != n_length) {
+                        g_error("Not same number of addresses (%zd) and lengths (%zd)", n_address, n_length);
+                    }
+                    if (clients[c].types != NULL && n_types != n_address) {
+                        g_error("Not same number of addresses (%zd) and types (%zd)", n_address, n_length);
+                    }
+
+                    clients[c].n = n_address;
                     if (opt->verbose) {
                         int n;
 
                         g_print("%s id: %d\n", groups[i], clients[c].id);
                         for (n=0; n < clients[c].n; n++) {
-                            g_print("Address %d => %d values\n",
-                                    clients[c].addresses[n], clients[c].lengths[n]);
+                            g_print("Address %d => %d values", clients[c].addresses[n], clients[c].lengths[n]);
+                            if (clients[c].types != NULL) {
+                                g_print(" (%s)\n", clients[c].types[n]);
+                            } else {
+                                g_print(" (int)\n");
+                            }
                         }
                     }
                     c++;
@@ -122,6 +136,7 @@ void keyfile_client_free(int nb_client, client_t* clients)
         for (i=0; i < nb_client; i++) {
             g_free(clients[i].addresses);
             g_free(clients[i].lengths);
+            g_strfreev(clients[i].types);
         }
         g_slice_free1(sizeof(client_t) * nb_client, clients);
     }

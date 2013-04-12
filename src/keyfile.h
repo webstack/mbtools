@@ -14,6 +14,7 @@ typedef struct {
     int n;
     int *addresses;
     int *lengths;
+    char **types;
 } client_t;
 
 client_t* keyfile_parse(option_t *opt, int *nb_client);

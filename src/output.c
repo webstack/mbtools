@@ -58,8 +58,9 @@ int output_write(int s, int slave_id, int addr, int nb_reg, char *type, uint16_t
     /* A string for each value */
     char **out_array = NULL;
     gboolean is_integer;
+    gboolean is_swapped = FALSE;
 
-    if (type == NULL || strncmp(type, "int", 3) == 0) {
+    if (type == NULL || strcmp(type, "int") == 0) {
         /* Integer */
         nb = nb_reg;
         is_integer = TRUE;
@@ -67,6 +68,7 @@ int output_write(int s, int slave_id, int addr, int nb_reg, char *type, uint16_t
         /* Float */
         nb = nb_reg / 2;
         is_integer = FALSE;
+        is_swapped = (strcmp(type, "floatlsb") == 0);
     }
 
     out_array = g_new(char*, nb + 1);
@@ -77,7 +79,13 @@ int output_write(int s, int slave_id, int addr, int nb_reg, char *type, uint16_t
             if (is_integer) {
                 out_array[i] = g_strdup_printf("mb_%d_%d %d", slave_id, addr + i, tab_reg[i]);
             } else {
-                float value = modbus_get_float(tab_reg + i);
+                float value;
+
+                if (is_swapped) {
+                    value = modbus_get_float_swapped(tab_reg + i);
+                } else {
+                    value = modbus_get_float(tab_reg + i);
+                }
                 out_array[i] = g_strdup_printf("mb_%d_%d %f", slave_id, addr + i, value);
             }
         } else {

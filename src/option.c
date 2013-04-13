@@ -1,6 +1,7 @@
 #include <string.h>
 #include <glib.h>
 #include <config.h>
+
 #include "option.h"
 #include "keyfile.h"
 

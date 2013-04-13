@@ -2,7 +2,6 @@
 
 #define _XOPEN_SOURCE /* glibc2 needs this */
 #include <glib.h>
-#include <unistd.h>
 #include <time.h>
 #include <string.h>
 

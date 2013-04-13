@@ -1,5 +1,6 @@
 #include <string.h>
 #include <glib.h>
+
 #include "keyfile.h"
 
 static gboolean keyfile_set_integer(GKeyFile *key_file, const gchar *group_name, const gchar *key, int *value);
@@ -97,9 +98,12 @@ client_t* keyfile_parse(option_t *opt, int *nb_client)
                     if (n_address != n_length) {
                         g_error("Not same number of addresses (%zd) and lengths (%zd)", n_address, n_length);
                     }
+
                     if (clients[c].types != NULL && n_types != n_address) {
                         g_error("Not same number of addresses (%zd) and types (%zd)", n_address, n_length);
                     }
+
+                    /* FIXME Check mutliple of two for float types */
 
                     clients[c].n = n_address;
                     if (opt->verbose) {

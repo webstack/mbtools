@@ -2,6 +2,7 @@
 #define _COLLECT_H_
 
 #include <modbus.h>
+
 #include "option.h"
 #include "keyfile.h"
 

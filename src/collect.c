@@ -1,6 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
 #include <signal.h>
 #include <unistd.h>
 #include <glib.h>
@@ -70,7 +68,7 @@ int collect_listen(modbus_t *ctx, option_t *opt)
                     s = output_connect(opt->socket_file, opt->verbose);
 
                 if (output_is_connected(s)) {
-                    if (output_write(s, -1, addr, nb, mb_mapping->tab_registers + addr, opt->verbose) == -1) {
+                    if (output_write(s, -1, addr, nb, NULL, mb_mapping->tab_registers + addr, opt->verbose) == -1) {
                         output_close(s);
                         s = -1;
                     }
@@ -126,24 +124,23 @@ void collect_poll(modbus_t *ctx, option_t *opt, client_t *clients, int nb_client
             }
 
             for (n = 0; n < client->n; n++) {
-                int nb_reg;
-
                 if (opt->verbose) {
                     g_print("ID: %d, addr:%d l:%d\n", client->id, client->addresses[n], client->lengths[n]);
                 }
 
-                nb_reg = modbus_read_registers(ctx, client->addresses[n], client->lengths[n], tab_reg);
-                if (nb_reg == -1) {
+                rc = modbus_read_registers(ctx, client->addresses[n], client->lengths[n], tab_reg);
+                if (rc == -1) {
                     g_warning("ID: %d, addr:%d l:%d %s\n", client->id, client->addresses[n], client->lengths[n],
                               modbus_strerror(errno));
                 } else {
                     /* Write to local unix socket */
-
                     if (!output_is_connected(s))
                         s = output_connect(opt->socket_file, opt->verbose);
 
                     if (output_is_connected(s)) {
-                        if (output_write(s, client->id, client->addresses[n], nb_reg, tab_reg, opt->verbose) == -1) {
+                        rc = output_write(s, client->id, client->addresses[n], client->lengths[n], client->types[n],
+                                          tab_reg, opt->verbose);
+                        if (rc == -1) {
                             output_close(s);
                             s = -1;
                         }

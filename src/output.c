@@ -7,37 +7,9 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <glib.h>
+#include <modbus.h>
 
 #include "output.h"
-
-int output_write(int s, int slave_id, int addr, int nb_reg, uint16_t *tab_reg, gboolean verbose)
-{
-    int rc;
-    int i;
-    char *output = NULL;
-    /* A string for each value */
-    char **out_array = g_new(char*, nb_reg + 1);
-
-    for (i = 0; i < nb_reg; i++) {
-        if (slave_id > 0)
-            out_array[i] = g_strdup_printf("mb_%d_%d %d", slave_id, addr + i, tab_reg[i]);
-        else
-            out_array[i] = g_strdup_printf("mb_%d %d", addr + i, tab_reg[i]);
-    }
-    out_array[i] = NULL;
-    output = g_strjoinv("|", out_array);
-    if (verbose)
-        g_print("%s\n", output);
-    rc = send(s, output, strlen(output), MSG_NOSIGNAL);
-
-    for (i = 0; i < nb_reg; i++) {
-        g_free(out_array[i]);
-    }
-    g_free(out_array);
-    g_free(output);
-
-    return rc;
-}
 
 int output_connect(char* socket_file, gboolean verbose)
 {
@@ -74,4 +46,58 @@ void output_close(int s)
 gboolean output_is_connected(int s)
 {
     return s > 0 ? TRUE : FALSE;
+}
+
+/* 7 arguments :-\ */
+int output_write(int s, int slave_id, int addr, int nb_reg, char *type, uint16_t *tab_reg, gboolean verbose)
+{
+    int rc;
+    int i;
+    int nb;
+    char *output = NULL;
+    /* A string for each value */
+    char **out_array = NULL;
+    gboolean is_integer;
+
+    if (type == NULL || strncmp(type, "int", 3) == 0) {
+        /* Integer */
+        nb = nb_reg;
+        is_integer = TRUE;
+    } else {
+        /* Float */
+        nb = nb_reg / 2;
+        is_integer = FALSE;
+    }
+
+    out_array = g_new(char*, nb + 1);
+
+    for (i = 0; i < nb; i++) {
+        if (slave_id > 0) {
+            /* Type is only handled in this mode (master) */
+            if (is_integer) {
+                out_array[i] = g_strdup_printf("mb_%d_%d %d", slave_id, addr + i, tab_reg[i]);
+            } else {
+                float value = modbus_get_float(tab_reg + i);
+                out_array[i] = g_strdup_printf("mb_%d_%d %f", slave_id, addr + i, value);
+            }
+        } else {
+            out_array[i] = g_strdup_printf("mb_%d %d", addr + i, tab_reg[i]);
+        }
+    }
+
+    /* Set final marker */
+    out_array[i] = NULL;
+
+    output = g_strjoinv("|", out_array);
+    if (verbose)
+        g_print("%s\n", output);
+    rc = send(s, output, strlen(output), MSG_NOSIGNAL);
+
+    for (i = 0; i < nb; i++) {
+        g_free(out_array[i]);
+    }
+    g_free(out_array);
+    g_free(output);
+
+    return rc;
 }

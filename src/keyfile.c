@@ -87,6 +87,13 @@ client_t* keyfile_parse(option_t *opt, int *nb_client)
 
                     /* Returns 0 if not found */
                     clients[c].id = g_key_file_get_integer(key_file, groups[i], "id", NULL);
+
+                    /* 'slave' + space + " + ... + " */
+                    if (strlen(groups[i]) > 8)
+                        clients[c].name = g_strndup(groups[i] + 7, strlen(groups[i]) - 8);
+                    else
+                        clients[c].name = g_strdup_printf("%d", clients[c].id);
+
                     clients[c].addresses = g_key_file_get_integer_list(key_file, groups[i], "addresses",
                                                                        &n_address, NULL);
                     clients[c].lengths = g_key_file_get_integer_list(key_file, groups[i], "lengths",
@@ -103,13 +110,14 @@ client_t* keyfile_parse(option_t *opt, int *nb_client)
                         g_error("Not same number of addresses (%zd) and types (%zd)", n_address, n_length);
                     }
 
+
                     /* FIXME Check mutliple of two for float types */
 
                     clients[c].n = n_address;
                     if (opt->verbose) {
                         int n;
 
-                        g_print("%s id: %d\n", groups[i], clients[c].id);
+                        g_print("Name %s, ID %d\n", clients[c].name, clients[c].id);
                         for (n=0; n < clients[c].n; n++) {
                             g_print("Address %d => %d values", clients[c].addresses[n], clients[c].lengths[n]);
                             if (clients[c].types != NULL) {
@@ -138,6 +146,7 @@ void keyfile_client_free(int nb_client, client_t* clients)
 
     if (nb_client > 0) {
         for (i=0; i < nb_client; i++) {
+            g_free(clients[i].name);
             g_free(clients[i].addresses);
             g_free(clients[i].lengths);
             g_strfreev(clients[i].types);

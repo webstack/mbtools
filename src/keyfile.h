@@ -11,6 +11,7 @@
 typedef struct {
     modbus_t *ctx;
     int id;
+    char *name;
     int n;
     int *addresses;
     int *lengths;

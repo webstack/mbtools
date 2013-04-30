@@ -48,8 +48,7 @@ gboolean output_is_connected(int s)
     return s > 0 ? TRUE : FALSE;
 }
 
-/* 7 arguments :-\ */
-int output_write(int s, int slave_id, int addr, int nb_reg, char *type, uint16_t *tab_reg, gboolean verbose)
+int output_write(int s, int slave_id, char *name, int addr, int nb_reg, char *type, uint16_t *tab_reg, gboolean verbose)
 {
     int rc;
     int i;
@@ -79,7 +78,7 @@ int output_write(int s, int slave_id, int addr, int nb_reg, char *type, uint16_t
         if (slave_id > 0) {
             /* Type is only handled in this mode (master) */
             if (is_integer) {
-                out_array[i] = g_strdup_printf("mb_%d_%d %d|", slave_id, addr + i, tab_reg[i]);
+                out_array[i] = g_strdup_printf("mb_%s_%d %d|", name, addr + i, tab_reg[i]);
             } else {
                 float value;
 
@@ -89,7 +88,7 @@ int output_write(int s, int slave_id, int addr, int nb_reg, char *type, uint16_t
                     value = modbus_get_float(tab_reg + j);
                 }
                 j += 2;
-                out_array[i] = g_strdup_printf("mb_%d_%d %f|", slave_id, addr + i, value);
+                out_array[i] = g_strdup_printf("mb_%s_%d %f|", name, addr + i, value);
             }
         } else {
             out_array[i] = g_strdup_printf("mb_%d %d|", addr + i, tab_reg[i]);

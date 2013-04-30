@@ -62,13 +62,13 @@ int collect_listen(modbus_t *ctx, option_t *opt)
 
                 /* Write to local unix socket */
                 if (opt->verbose)
-                  g_print("Addr %d: %d values\n", addr, nb);
+                    g_print("Addr %d: %d values\n", addr, nb);
 
                 if (!output_is_connected(s))
                     s = output_connect(opt->socket_file, opt->verbose);
 
                 if (output_is_connected(s)) {
-                    if (output_write(s, -1, addr, nb, NULL, mb_mapping->tab_registers + addr, opt->verbose) == -1) {
+                    if (output_write(s, -1, NULL, addr, nb, NULL, mb_mapping->tab_registers + addr, opt->verbose) == -1) {
                         output_close(s);
                         s = -1;
                     }
@@ -138,8 +138,8 @@ void collect_poll(modbus_t *ctx, option_t *opt, client_t *clients, int nb_client
                         s = output_connect(opt->socket_file, opt->verbose);
 
                     if (output_is_connected(s)) {
-                        rc = output_write(s, client->id, client->addresses[n], client->lengths[n], client->types[n],
-                                          tab_reg, opt->verbose);
+                        rc = output_write(s, client->id, client->name, client->addresses[n], client->lengths[n],
+                                          client->types[n], tab_reg, opt->verbose);
                         if (rc == -1) {
                             output_close(s);
                             s = -1;

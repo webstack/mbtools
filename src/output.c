@@ -53,6 +53,7 @@ int output_write(int s, int slave_id, int addr, int nb_reg, char *type, uint16_t
 {
     int rc;
     int i;
+    int j;
     int nb;
     char *output = NULL;
     /* A string for each value */
@@ -73,7 +74,7 @@ int output_write(int s, int slave_id, int addr, int nb_reg, char *type, uint16_t
 
     out_array = g_new(char*, nb + 1);
 
-    for (i = 0; i < nb; i++) {
+    for (i = 0, j = 0; i < nb; i++) {
         if (slave_id > 0) {
             /* Type is only handled in this mode (master) */
             if (is_integer) {
@@ -82,10 +83,11 @@ int output_write(int s, int slave_id, int addr, int nb_reg, char *type, uint16_t
                 float value;
 
                 if (is_swapped) {
-                    value = modbus_get_float_swapped(tab_reg + i);
+                    value = modbus_get_float_swapped(tab_reg + j);
                 } else {
-                    value = modbus_get_float(tab_reg + i);
+                    value = modbus_get_float(tab_reg + j);
                 }
+                j += 2;
                 out_array[i] = g_strdup_printf("mb_%d_%d %f", slave_id, addr + i, value);
             }
         } else {

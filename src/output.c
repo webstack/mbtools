@@ -72,13 +72,14 @@ int output_write(int s, int slave_id, int addr, int nb_reg, char *type, uint16_t
         is_swapped = (strcmp(type, "floatlsb") == 0);
     }
 
+    /* nb and NULL marker */
     out_array = g_new(char*, nb + 1);
 
     for (i = 0, j = 0; i < nb; i++) {
         if (slave_id > 0) {
             /* Type is only handled in this mode (master) */
             if (is_integer) {
-                out_array[i] = g_strdup_printf("mb_%d_%d %d", slave_id, addr + i, tab_reg[i]);
+                out_array[i] = g_strdup_printf("mb_%d_%d %d|", slave_id, addr + i, tab_reg[i]);
             } else {
                 float value;
 
@@ -88,19 +89,23 @@ int output_write(int s, int slave_id, int addr, int nb_reg, char *type, uint16_t
                     value = modbus_get_float(tab_reg + j);
                 }
                 j += 2;
-                out_array[i] = g_strdup_printf("mb_%d_%d %f", slave_id, addr + i, value);
+                out_array[i] = g_strdup_printf("mb_%d_%d %f|", slave_id, addr + i, value);
             }
         } else {
-            out_array[i] = g_strdup_printf("mb_%d %d", addr + i, tab_reg[i]);
+            out_array[i] = g_strdup_printf("mb_%d %d|", addr + i, tab_reg[i]);
         }
     }
 
-    /* Set final marker */
+    /* Set final marker of the array */
     out_array[i] = NULL;
+    output = g_strjoinv(NULL, out_array);
 
-    output = g_strjoinv("|", out_array);
+    /* Replace final '|' by '\n' */
+    output[strlen(output) - 1] = '\n';
+
     if (verbose)
         g_print("%s\n", output);
+
     rc = send(s, output, strlen(output), MSG_NOSIGNAL);
 
     for (i = 0; i < nb; i++) {

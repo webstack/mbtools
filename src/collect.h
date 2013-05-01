@@ -7,6 +7,6 @@
 #include "keyfile.h"
 
 int collect_listen(modbus_t *ctx, option_t *opt);
-void collect_poll(modbus_t *ctx, option_t *opt, client_t *clients, int nb_client);
+void collect_poll(modbus_t *ctx, option_t *opt, server_t *servers, int nb_server);
 
 #endif /* _COLLECT_H_ */

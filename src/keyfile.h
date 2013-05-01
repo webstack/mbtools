@@ -16,9 +16,9 @@ typedef struct {
     int *addresses;
     int *lengths;
     char **types;
-} client_t;
+} server_t;
 
-client_t* keyfile_parse(option_t *opt, int *nb_client);
-void keyfile_client_free(int nb_client, client_t* clients);
+server_t* keyfile_parse(option_t *opt, int *nb_server);
+void keyfile_server_free(int nb_server, server_t* servers);
 
 #endif /* _KEYFILE_H_ */

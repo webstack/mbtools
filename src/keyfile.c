@@ -6,13 +6,13 @@
 static gboolean keyfile_set_integer(GKeyFile *key_file, const gchar *group_name, const gchar *key, int *value);
 
 /* Parse config file (.ini-like file) */
-client_t* keyfile_parse(option_t *opt, int *nb_client)
+server_t* keyfile_parse(option_t *opt, int *nb_server)
 {
     int i;
     GKeyFile *key_file = NULL;
-    client_t* clients = NULL;
+    server_t* servers = NULL;
 
-    *nb_client = 0;
+    *nb_server = 0;
 
     if (opt->ini_file == NULL) {
         return NULL;
@@ -63,19 +63,19 @@ client_t* keyfile_parse(option_t *opt, int *nb_client)
     if (opt->mode == OPT_MODE_MASTER) {
         gchar** groups = g_key_file_get_groups(key_file, NULL);
 
-        /* Count [slave] sections to allocate clients */
+        /* Count [slave] sections to allocate servers */
         i = 0;
         while (groups[i] != NULL) {
             if ((strncmp(groups[i++], "slave", 5) == 0)) {
-                (*nb_client)++;
+                (*nb_server)++;
             }
         }
 
-        if ((*nb_client) > 0) {
+        if ((*nb_server) > 0) {
             int c;
 
-            /* Allocate clients */
-            clients = g_slice_alloc(sizeof(client_t) * (*nb_client));
+            /* Allocate servers */
+            servers = g_slice_alloc(sizeof(server_t) * (*nb_server));
 
             i = 0;
             c = 0;
@@ -86,42 +86,42 @@ client_t* keyfile_parse(option_t *opt, int *nb_client)
                     gsize n_types;
 
                     /* Returns 0 if not found */
-                    clients[c].id = g_key_file_get_integer(key_file, groups[i], "id", NULL);
+                    servers[c].id = g_key_file_get_integer(key_file, groups[i], "id", NULL);
 
                     /* 'slave' + space + " + ... + " */
                     if (strlen(groups[i]) > 8)
-                        clients[c].name = g_strndup(groups[i] + 7, strlen(groups[i]) - 8);
+                        servers[c].name = g_strndup(groups[i] + 7, strlen(groups[i]) - 8);
                     else
-                        clients[c].name = g_strdup_printf("%d", clients[c].id);
+                        servers[c].name = g_strdup_printf("%d", servers[c].id);
 
-                    clients[c].addresses = g_key_file_get_integer_list(key_file, groups[i], "addresses",
+                    servers[c].addresses = g_key_file_get_integer_list(key_file, groups[i], "addresses",
                                                                        &n_address, NULL);
-                    clients[c].lengths = g_key_file_get_integer_list(key_file, groups[i], "lengths",
+                    servers[c].lengths = g_key_file_get_integer_list(key_file, groups[i], "lengths",
                                                                      &n_length, NULL);
                     /* Types are optional (integer by default) but it's all or nothing */
-                    clients[c].types = g_key_file_get_string_list(key_file, groups[i], "types", &n_types, NULL);
+                    servers[c].types = g_key_file_get_string_list(key_file, groups[i], "types", &n_types, NULL);
 
                     /* Check list to be sure each address is associated to a length */
                     if (n_address != n_length) {
                         g_error("Not same number of addresses (%zd) and lengths (%zd)", n_address, n_length);
                     }
 
-                    if (clients[c].types != NULL && n_types != n_address) {
+                    if (servers[c].types != NULL && n_types != n_address) {
                         g_error("Not same number of addresses (%zd) and types (%zd)", n_address, n_length);
                     }
 
 
                     /* FIXME Check mutliple of two for float types */
 
-                    clients[c].n = n_address;
+                    servers[c].n = n_address;
                     if (opt->verbose) {
                         int n;
 
-                        g_print("Name %s, ID %d\n", clients[c].name, clients[c].id);
-                        for (n=0; n < clients[c].n; n++) {
-                            g_print("Address %d => %d values", clients[c].addresses[n], clients[c].lengths[n]);
-                            if (clients[c].types != NULL) {
-                                g_print(" (%s)\n", clients[c].types[n]);
+                        g_print("Name %s, ID %d\n", servers[c].name, servers[c].id);
+                        for (n=0; n < servers[c].n; n++) {
+                            g_print("Address %d => %d values", servers[c].addresses[n], servers[c].lengths[n]);
+                            if (servers[c].types != NULL) {
+                                g_print(" (%s)\n", servers[c].types[n]);
                             } else {
                                 g_print(" (int)\n");
                             }
@@ -137,21 +137,21 @@ client_t* keyfile_parse(option_t *opt, int *nb_client)
 
     g_key_file_free(key_file);
 
-    return clients;
+    return servers;
 }
 
-void keyfile_client_free(int nb_client, client_t* clients)
+void keyfile_server_free(int nb_server, server_t* servers)
 {
     int i;
 
-    if (nb_client > 0) {
-        for (i=0; i < nb_client; i++) {
-            g_free(clients[i].name);
-            g_free(clients[i].addresses);
-            g_free(clients[i].lengths);
-            g_strfreev(clients[i].types);
+    if (nb_server > 0) {
+        for (i=0; i < nb_server; i++) {
+            g_free(servers[i].name);
+            g_free(servers[i].addresses);
+            g_free(servers[i].lengths);
+            g_strfreev(servers[i].types);
         }
-        g_slice_free1(sizeof(client_t) * nb_client, clients);
+        g_slice_free1(sizeof(server_t) * nb_server, servers);
     }
 }
 

@@ -83,7 +83,7 @@ int collect_listen(modbus_t *ctx, option_t *opt)
     return 0;
 }
 
-void collect_poll(modbus_t *ctx, option_t *opt, client_t *clients, int nb_client)
+void collect_poll(modbus_t *ctx, option_t *opt, server_t *servers, int nb_server)
 {
     int rc;
     int i;
@@ -114,23 +114,23 @@ void collect_poll(modbus_t *ctx, option_t *opt, client_t *clients, int nb_client
             g_print("\n");
         }
 
-        for (i = 0; i < nb_client; i++) {
-            client_t *client = &(clients[i]);
+        for (i = 0; i < nb_server; i++) {
+            server_t *server = &(servers[i]);
 
-            rc = modbus_set_slave(ctx, client->id);
+            rc = modbus_set_slave(ctx, server->id);
             if (rc != 0) {
-                g_warning("modbus_set_slave with ID %d: %s\n", client->id, modbus_strerror(errno));
+                g_warning("modbus_set_slave with ID %d: %s\n", server->id, modbus_strerror(errno));
                 continue;
             }
 
-            for (n = 0; n < client->n; n++) {
+            for (n = 0; n < server->n; n++) {
                 if (opt->verbose) {
-                    g_print("ID: %d, addr:%d l:%d\n", client->id, client->addresses[n], client->lengths[n]);
+                    g_print("ID: %d, addr:%d l:%d\n", server->id, server->addresses[n], server->lengths[n]);
                 }
 
-                rc = modbus_read_registers(ctx, client->addresses[n], client->lengths[n], tab_reg);
+                rc = modbus_read_registers(ctx, server->addresses[n], server->lengths[n], tab_reg);
                 if (rc == -1) {
-                    g_warning("ID: %d, addr:%d l:%d %s\n", client->id, client->addresses[n], client->lengths[n],
+                    g_warning("ID: %d, addr:%d l:%d %s\n", server->id, server->addresses[n], server->lengths[n],
                               modbus_strerror(errno));
                 } else {
                     /* Write to local unix socket */
@@ -138,8 +138,8 @@ void collect_poll(modbus_t *ctx, option_t *opt, client_t *clients, int nb_client
                         s = output_connect(opt->socket_file, opt->verbose);
 
                     if (output_is_connected(s)) {
-                        rc = output_write(s, client->id, client->name, client->addresses[n], client->lengths[n],
-                                          client->types[n], tab_reg, opt->verbose);
+                        rc = output_write(s, server->id, server->name, server->addresses[n], server->lengths[n],
+                                          server->types[n], tab_reg, opt->verbose);
                         if (rc == -1) {
                             output_close(s);
                             s = -1;
@@ -156,8 +156,8 @@ int main(int argc, char *argv[])
 {
     int rc = 0;
     option_t *opt = NULL;
-    int nb_client = 0;
-    client_t *clients = NULL;
+    int nb_server = 0;
+    server_t *servers = NULL;
     modbus_t *ctx = NULL;
 
 reload:
@@ -167,7 +167,7 @@ reload:
     option_parse(opt, argc, argv);
 
     /* Parse .ini file */
-    clients = keyfile_parse(opt, &nb_client);
+    servers = keyfile_parse(opt, &nb_server);
 
     if (option_set_undefined(opt) == -1) {
         goto quit;
@@ -209,7 +209,7 @@ reload:
         }
         collect_listen(ctx, opt);
     } else {
-        collect_poll(ctx, opt, clients, nb_client);
+        collect_poll(ctx, opt, servers, nb_server);
     }
 
 quit:
@@ -220,7 +220,7 @@ quit:
     modbus_close(ctx);
     modbus_free(ctx);
 
-    keyfile_client_free(nb_client, clients);
+    keyfile_server_free(nb_server, servers);
     option_free(opt);
 
     if (reload) {

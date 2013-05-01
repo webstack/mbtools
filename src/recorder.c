@@ -12,16 +12,17 @@
 #define SOCK_PATH "/tmp/mbsocket"
 
 static volatile int stop = 0;
+static volatile int s = 0;
 
 static void sigint_stop(int dummy)
 {
     /* Stop the main process */
     stop = 1;
+    close(s);
 }
 
 int main(int argc, char **argv)
 {
-    int s;
     struct sockaddr_un server;
     char str[RECV_MAX];
     int msgsock = -1;
@@ -46,11 +47,11 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-
     while (!stop) {
         printf("Waiting for a connection...\n");
         msgsock = accept(s, 0, 0);
         if (msgsock == -1) {
+            unlink(server.sun_path);
             perror("accept");
             exit(1);
         }

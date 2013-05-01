@@ -21,15 +21,29 @@
 #endif
 #include <stdlib.h>
 #include <errno.h>
+#include <signal.h>
 
 #include <modbus.h>
+
+static int socket = -1;
+static modbus_t *ctx;
+static modbus_mapping_t *mb_mapping;
+
+static void signal_handler(int dummy)
+{
+    modbus_mapping_free(mb_mapping);
+    if (socket != -1) {
+        close(socket);
+    }
+    modbus_close(ctx);
+    modbus_free(ctx);
+
+    exit(dummy);
+}
 
 int main(int argc, char *argv[])
 {
     int i;
-    int socket = -1;
-    modbus_t *ctx;
-    modbus_mapping_t *mb_mapping;
 
     if (argc == 1) {
         ctx = modbus_new_rtu("/dev/ttyUSB1", 115200, 'N', 8, 1);
@@ -58,6 +72,8 @@ int main(int argc, char *argv[])
         mb_mapping->tab_registers[i + 4] = i+1;
     }
 
+    signal(SIGINT, signal_handler);
+
     for (;;) {
         uint8_t query[MODBUS_TCP_MAX_ADU_LENGTH];
         int rc;
@@ -74,8 +90,9 @@ int main(int argc, char *argv[])
     printf("Quit the loop: %s\n", modbus_strerror(errno));
 
     modbus_mapping_free(mb_mapping);
-    if (socket != -1)
+    if (socket != -1) {
         close(socket);
+    }
     modbus_close(ctx);
     modbus_free(ctx);
 

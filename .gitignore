@@ -8,10 +8,15 @@ depcomp
 install-sh
 missing
 *.o
+*~
 .deps
 config.h
 config.h.in
 config.log
 config.status
 stamp-h1
-src/mblogger
+*.sublime*
+build-aux
+src/mbrecorder
+src/mbcollect
+tests/unit-test-server

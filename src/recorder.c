@@ -49,7 +49,7 @@ int main(int argc, char **argv)
 
     while (!stop) {
         printf("Waiting for a connection...\n");
-        msgsock = accept(s, 0, 0);
+        msgsock = accept4(s, 0, 0, SOCK_CLOEXEC);
         if (msgsock == -1) {
             unlink(server.sun_path);
             perror("accept");

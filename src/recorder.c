@@ -28,6 +28,8 @@ int main(int argc, char **argv)
     int msgsock = -1;
     int error;
 
+    /* Disable buffering */
+    setbuf(stdout, NULL);
     signal(SIGINT, sigint_stop);
 
     if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
@@ -48,7 +50,6 @@ int main(int argc, char **argv)
     }
 
     while (!stop) {
-        printf("Waiting for a connection...\n");
         msgsock = accept4(s, 0, 0, SOCK_CLOEXEC);
         if (msgsock == -1) {
             unlink(server.sun_path);
@@ -59,15 +60,13 @@ int main(int argc, char **argv)
         while (!error && !stop) {
             int n;
 
-            printf("Reading... ");
             n = read(msgsock, str, RECV_MAX - 1);
-            printf("%d bytes received\n", n);
             if (n <= 0) {
                 perror("recv");
                 error = 1;
             } else {
                 str[n] = '\0';
-                printf("%s\n", str);
+                printf("%s", str);
             }
         }
         close(msgsock);

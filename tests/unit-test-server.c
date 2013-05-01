@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
     }
 
     modbus_set_float(12345.6, mb_mapping->tab_registers);
-    modbus_set_float_swapped(789.0, mb_mapping->tab_registers + 2);
+    modbus_set_float_dcba(789.0, mb_mapping->tab_registers + 2);
     for (i=0; i < 10; i++) {
         mb_mapping->tab_registers[i + 4] = i+1;
     }

@@ -51,8 +51,7 @@ gboolean output_is_connected(int s)
 int output_write(int s, int slave_id, char *name, int addr, int nb_reg, char *type, uint16_t *tab_reg, gboolean verbose)
 {
     int rc;
-    int i;
-    int j;
+    int i, j;
     int nb;
     char *output = NULL;
     /* A string for each value */
@@ -62,12 +61,12 @@ int output_write(int s, int slave_id, char *name, int addr, int nb_reg, char *ty
 
     if (type == NULL || strcmp(type, "int") == 0) {
         /* Integer */
-        nb = nb_reg;
         is_integer = TRUE;
+        nb = nb_reg;
     } else {
         /* Float */
-        nb = nb_reg / 2;
         is_integer = FALSE;
+        nb = nb_reg / 2;
         is_swapped = (strcmp(type, "floatlsb") == 0);
     }
 
@@ -87,8 +86,8 @@ int output_write(int s, int slave_id, char *name, int addr, int nb_reg, char *ty
                 } else {
                     value = modbus_get_float(tab_reg + j);
                 }
+                out_array[i] = g_strdup_printf("mb_%s_%d %f|", name, addr + j, value);
                 j += 2;
-                out_array[i] = g_strdup_printf("mb_%s_%d %f|", name, addr + i, value);
             }
         } else {
             out_array[i] = g_strdup_printf("mb_%d %d|", addr + i, tab_reg[i]);

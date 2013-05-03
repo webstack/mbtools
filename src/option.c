@@ -10,14 +10,17 @@ option_t* option_new(void)
     option_t *opt;
     opt = g_slice_new(option_t);
 
-    /* Initialize */
     opt->mode = OPT_MODE_UNDEFINED;
+    opt->backend = OPT_BACKEND_UNDEFINED;
+
+    /* RTU */
     opt->id = -1;
     opt->device = NULL;
     opt->baud = -1;
     opt->parity = NULL;
     opt->data_bit = -1;
     opt->stop_bit = -1;
+
     opt->interval = -1;
     opt->socket_file = NULL;
     opt->ini_file = NULL;
@@ -49,17 +52,18 @@ void option_parse(option_t* opt, int argc, char **argv)
     GOptionContext *context;
     GError *error = NULL;
     GOptionEntry entries[] = {
-        {"mode", 'm', 0, G_OPTION_ARG_STRING, &mode_string, "Run in 'master' (default) or 'slave' mode", NULL},
+        {"mode", 'm', 0, G_OPTION_ARG_STRING, &mode_string,
+         "Run in 'master' (default), 'slave', 'client' or 'server' mode", NULL},
         {"id", 0, 0, G_OPTION_ARG_INT, &(opt->id), "Slave ID in slave mode", "1"},
         {"device", 0, 0, G_OPTION_ARG_FILENAME, &(opt->device), "Device (eg. /dev/ttyUSB0)", NULL},
         {"baud", 'b', 0, G_OPTION_ARG_INT, &(opt->baud), "Baud", "115200"},
         {"parity", 'p', 0, G_OPTION_ARG_STRING, &(opt->parity),
-        "Parity is 'O' for Odd, 'E' for Even or 'N' for None", "N"},
+         "Parity is 'O' for Odd, 'E' for Even or 'N' for None", "N"},
         {"databit", 'd', 0, G_OPTION_ARG_INT, &(opt->data_bit), "Bits of data (7 or 8)", "8"},
         {"stopbit", 's', 0, G_OPTION_ARG_INT, &(opt->stop_bit), "Bits of stop (1 or 2)", "1"},
         {"interval", 'i', 0, G_OPTION_ARG_INT, &(opt->interval), "Interval in seconds", NULL},
         {"socketfile", 0, 0, G_OPTION_ARG_FILENAME, &(opt->socket_file),
-        "Local Unix socket file (eg. /tmp/mbsocket)", NULL},
+         "Local Unix socket file (eg. /tmp/mbsocket)", NULL},
         {"inifile", 'f', 0, G_OPTION_ARG_FILENAME, &(opt->ini_file), "Filename of config file (.ini-like)", NULL},
         {"daemon", 0, 0, G_OPTION_ARG_NONE, &(opt->daemon), "Run in daemon mode", NULL},
         {"pidfile", 0, 0, G_OPTION_ARG_FILENAME, &(opt->pid_file), "File to save thee PID", "PIDFILE"},
@@ -86,7 +90,8 @@ void option_parse(option_t* opt, int argc, char **argv)
         g_error("option parsing failed: %s\n", error->message);
     }
 
-    opt->mode = option_parse_mode(mode_string);
+    option_set_mode(opt, option_parse_mode(mode_string));
+
     g_free(mode_string);
 
     if (opt->ini_file == NULL) {
@@ -99,7 +104,8 @@ void option_parse(option_t* opt, int argc, char **argv)
     }
 }
 
-opt_mode_t option_parse_mode(char *mode_string) {
+opt_mode_t option_parse_mode(char *mode_string)
+{
     if (mode_string == NULL)
         return OPT_MODE_UNDEFINED;
 
@@ -109,14 +115,32 @@ opt_mode_t option_parse_mode(char *mode_string) {
     if (strcmp(mode_string, "slave") == 0)
         return OPT_MODE_SLAVE;
 
+    if (strcmp(mode_string, "client") == 0)
+        return OPT_MODE_CLIENT;
+
+    if (strcmp(mode_string, "server") == 0)
+        return OPT_MODE_SERVER;
+
     g_error("invalid mode '%s'", mode_string);
+}
+
+/* Set mode and backend accordingly */
+void option_set_mode(option_t *opt, opt_mode_t mode)
+{
+    opt->mode = mode;
+    if (mode == OPT_MODE_MASTER || mode == OPT_MODE_SLAVE) {
+        opt->backend = OPT_BACKEND_RTU;
+    } else if (mode == OPT_MODE_CLIENT || mode == OPT_MODE_SERVER) {
+        opt->backend = OPT_BACKEND_TCP;
+    }
 }
 
 int option_set_undefined(option_t *opt)
 {
     /* Set the default values */
-    if (opt->mode == OPT_MODE_UNDEFINED)
-        opt->mode = OPT_MODE_MASTER;
+    if (opt->mode == OPT_MODE_UNDEFINED) {
+        option_set_mode(opt, OPT_MODE_MASTER);
+    }
 
     if (opt->id == -1)
         opt->id = 1;

@@ -30,7 +30,7 @@ server_t* keyfile_parse(option_t *opt, int *nb_server)
 
     if (opt->mode == OPT_MODE_UNDEFINED) {
         char *mode_string = g_key_file_get_string(key_file, "settings", "mode", NULL);
-        opt->mode = option_parse_mode(mode_string);
+        option_set_mode(opt, option_parse_mode(mode_string));
         g_free(mode_string);
     }
 

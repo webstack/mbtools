@@ -11,7 +11,6 @@
 #include "option.h"
 #include "keyfile.h"
 #include "output.h"
-#include "collect.h"
 
 #define BITS_NB 0
 #define INPUT_BITS_NB 0
@@ -20,11 +19,18 @@
 
 static volatile gboolean stop = FALSE;
 static volatile gboolean reload = FALSE;
+/* Required to stop server */
+static int opt_mode = OPT_MODE_MASTER;
+static modbus_t *ctx = NULL;
 
 static void sigint_stop(int dummy)
 {
     /* Stop the main process */
     stop = TRUE;
+    if (opt_mode == OPT_MODE_SLAVE) {
+        /* Rude way to stop server */
+        modbus_close(ctx);
+    }
 }
 
 static void sighup_reload(int dummy)
@@ -33,7 +39,7 @@ static void sighup_reload(int dummy)
     reload = TRUE;
 }
 
-int collect_listen(modbus_t *ctx, option_t *opt)
+static int collect_listen(option_t *opt)
 {
     modbus_mapping_t *mb_mapping = NULL;
     uint8_t query[MODBUS_RTU_MAX_ADU_LENGTH];
@@ -83,7 +89,7 @@ int collect_listen(modbus_t *ctx, option_t *opt)
     return 0;
 }
 
-void collect_poll(modbus_t *ctx, option_t *opt, server_t *servers, int nb_server)
+static void collect_poll(option_t *opt, int nb_server, server_t *servers)
 {
     int rc;
     int i;
@@ -158,7 +164,6 @@ int main(int argc, char *argv[])
     option_t *opt = NULL;
     int nb_server = 0;
     server_t *servers = NULL;
-    modbus_t *ctx = NULL;
 
 reload:
 
@@ -207,9 +212,11 @@ reload:
         if (opt->verbose) {
             g_print("Running in slave mode\n");
         }
-        collect_listen(ctx, opt);
+        /* Set global var for sigint */
+        opt_mode = OPT_MODE_SLAVE;
+        collect_listen(opt);
     } else {
-        collect_poll(ctx, opt, servers, nb_server);
+        collect_poll(opt, nb_server, servers);
     }
 
 quit:

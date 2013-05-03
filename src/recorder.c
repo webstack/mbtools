@@ -76,8 +76,9 @@ int main(int argc, char **argv)
     if (msgsock != -1)
         close(msgsock);
 
-    unlink(server.sun_path);
+    /* Close socket first to not wait locked file */
     close(s);
+    unlink(server.sun_path);
 
     return 0;
 }

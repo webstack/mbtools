@@ -7,20 +7,15 @@ import signal
 import unittest
 
 
-class SlaveTestCase(unittest.TestCase):
+class MasterTestCase(unittest.TestCase):
 
     def setUp(self):
         if os.path.exists("/tmp/mbsocket"):
             os.unlink("/tmp/mbsocket")
 
-        # Run server
-        self.uts = Popen("./unit-test-server", stdout=PIPE, stderr=PIPE, close_fds=True)
-
-        # Run recorder
+        self.uts = Popen("./unit-test-server", stdout=PIPE, stderr=PIPE)
         self.rec = Popen(["../src/mbrecorder"], stdout=PIPE)
-
-        # Run collect
-        self.col = Popen(["../src/mbcollect", "-f", "slave-test-case.ini"], stdout=PIPE)
+        self.col = Popen(["../src/mbcollect", "-f", "master-test-case.ini"], stdout=PIPE)
 
     def tearDown(self):
         self.col.send_signal(signal.SIGTERM)
@@ -88,6 +83,31 @@ class SlaveTestCase(unittest.TestCase):
                     self.assertEqual(m.group(3), '\n')
 
                 start = m.end()
+
+
+class SlaveTestCase(unittest.TestCase):
+
+    def setUp(self):
+        if os.path.exists("/tmp/mbsocket"):
+            os.unlink("/tmp/mbsocket")
+
+        self.rec = Popen(["../src/mbrecorder"], stdout=PIPE)
+        self.col = Popen(["../src/mbcollect", "-f", "slave-test-case.ini"], stdout=PIPE)
+        self.uts = Popen(["./unit-test-client", "rtu"], stdout=PIPE, stderr=PIPE)
+
+    def tearDown(self):
+        self.col.send_signal(signal.SIGTERM)
+        self.rec.send_signal(signal.SIGTERM)
+        self.col.wait()
+        self.rec.wait()
+        # Client stops himself
+
+    def test_recorder(self):
+        # Client write only one register
+        self.assertEqual(self.rec.stdout.readline(), "mb_0 1234\n")
+        # Another query with two registers
+        self.assertEqual(self.rec.stdout.readline(), "mb_1 5678|mb_2 9012\n")
+
 
 if __name__ == '__main__':
     unittest.main()

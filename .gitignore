@@ -19,4 +19,5 @@ stamp-h1
 build-aux
 src/mbrecorder
 src/mbcollect
+tests/unit-test-client
 tests/unit-test-server

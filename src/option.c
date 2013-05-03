@@ -21,6 +21,10 @@ option_t* option_new(void)
     opt->data_bit = -1;
     opt->stop_bit = -1;
 
+    /* TCP */
+    opt->ip = NULL;
+    opt->port = -1;
+
     opt->interval = -1;
     opt->socket_file = NULL;
     opt->ini_file = NULL;
@@ -36,6 +40,7 @@ void option_free(option_t *opt)
     g_free(opt->pid_file);
     g_free(opt->device);
     g_free(opt->parity);
+    g_free(opt->ip);
     g_free(opt->socket_file);
     g_free(opt->ini_file);
     g_slice_free(option_t, opt);
@@ -61,6 +66,8 @@ void option_parse(option_t* opt, int argc, char **argv)
          "Parity is 'O' for Odd, 'E' for Even or 'N' for None", "N"},
         {"databit", 'd', 0, G_OPTION_ARG_INT, &(opt->data_bit), "Bits of data (7 or 8)", "8"},
         {"stopbit", 's', 0, G_OPTION_ARG_INT, &(opt->stop_bit), "Bits of stop (1 or 2)", "1"},
+        {"ip", 0, 0, G_OPTION_ARG_STRING, &(opt->ip), "IP address of server (eg. 127.0.0.1)", NULL},
+        {"port", 0, 0, G_OPTION_ARG_INT, &(opt->port), "Port number of server (eg. 1502)", NULL},
         {"interval", 'i', 0, G_OPTION_ARG_INT, &(opt->interval), "Interval in seconds", NULL},
         {"socketfile", 0, 0, G_OPTION_ARG_FILENAME, &(opt->socket_file),
          "Local Unix socket file (eg. /tmp/mbsocket)", NULL},
@@ -142,26 +149,34 @@ int option_set_undefined(option_t *opt)
         option_set_mode(opt, OPT_MODE_MASTER);
     }
 
-    if (opt->id == -1)
-        opt->id = 1;
+    if (opt->backend == OPT_BACKEND_RTU) {
+        if (opt->id == -1)
+            opt->id = 1;
 
-    if (opt->interval == -1)
-        opt->interval = 10;
+        if (opt->interval == -1)
+            opt->interval = 10;
 
-    if (opt->device == NULL)
-        opt->device = g_strdup("/dev/ttyUSB0");
+        if (opt->device == NULL)
+            opt->device = g_strdup("/dev/ttyUSB0");
 
-    if (opt->baud == -1)
-        opt->baud = 115200;
+        if (opt->baud == -1)
+            opt->baud = 115200;
 
-    if (opt->parity == NULL)
-        opt->parity = g_strdup("N");
+        if (opt->parity == NULL)
+            opt->parity = g_strdup("N");
 
-    if (opt->data_bit == -1)
-        opt->data_bit = 8;
+        if (opt->data_bit == -1)
+            opt->data_bit = 8;
 
-    if (opt->stop_bit == -1)
-        opt->stop_bit = 1;
+        if (opt->stop_bit == -1)
+            opt->stop_bit = 1;
+    } else {
+        if (opt->ip == NULL)
+            opt->ip = g_strdup("127.0.0.1");
+
+        if (opt->port == -1)
+            opt->port = 502;
+    }
 
     if (opt->socket_file == NULL)
         opt->socket_file = g_strdup("/tmp/mbsocket");

@@ -28,6 +28,9 @@ typedef struct {
     char *parity;
     int data_bit;
     int stop_bit;
+    /* TCP */
+    char *ip;
+    int port;
     /* Recorder */
     int interval;
     char *socket_file;

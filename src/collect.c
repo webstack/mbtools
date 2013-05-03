@@ -196,11 +196,15 @@ reload:
     signal(SIGINT, sigint_stop);
     signal(SIGHUP, sighup_reload);
 
-    ctx = modbus_new_rtu(opt->device, opt->baud, opt->parity[0], opt->data_bit, opt->stop_bit);
-    if (ctx == NULL) {
-        fprintf(stderr, "Modbus init error\n");
-        rc = -1;
-        goto quit;
+    if (opt->backend == OPT_BACKEND_RTU) {
+        ctx = modbus_new_rtu(opt->device, opt->baud, opt->parity[0], opt->data_bit, opt->stop_bit);
+        if (ctx == NULL) {
+            fprintf(stderr, "Modbus init error\n");
+            rc = -1;
+            goto quit;
+        }
+    } else {
+
     }
 
     modbus_set_debug(ctx, opt->verbose);

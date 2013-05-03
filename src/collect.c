@@ -22,6 +22,7 @@ static volatile gboolean reload = FALSE;
 /* Required to stop server */
 static int opt_mode = OPT_MODE_MASTER;
 static modbus_t *ctx = NULL;
+static int socket = 0;
 
 static void sigint_stop(int dummy)
 {
@@ -30,6 +31,9 @@ static void sigint_stop(int dummy)
     if (opt_mode == OPT_MODE_SLAVE) {
         /* Rude way to stop server */
         modbus_close(ctx);
+    } else if (opt_mode == OPT_MODE_SERVER) {
+        close(socket);
+        socket = 0;
     }
 }
 
@@ -51,7 +55,11 @@ static int collect_listen(option_t *opt)
         fprintf(stderr, "Failed to allocate the mapping: %s\n", modbus_strerror(errno));
         return -1;
     }
-    modbus_set_slave(ctx, opt->id);
+
+    if (opt->backend == OPT_BACKEND_RTU) {
+        modbus_set_slave(ctx, opt->id);
+    }
+
     while (!stop) {
         int rc;
 
@@ -96,7 +104,7 @@ static void collect_poll(option_t *opt, int nb_server, server_t *servers)
     int n;
     uint16_t tab_reg[MODBUS_MAX_READ_REGISTERS];
     /* Local unix socket to output */
-    int s = 0;
+    int output_socket = 0;
 
     while (!stop) {
         GTimeVal tv;
@@ -140,22 +148,22 @@ static void collect_poll(option_t *opt, int nb_server, server_t *servers)
                               modbus_strerror(errno));
                 } else {
                     /* Write to local unix socket */
-                    if (!output_is_connected(s))
-                        s = output_connect(opt->socket_file, opt->verbose);
+                    if (!output_is_connected(output_socket))
+                        output_socket = output_connect(opt->socket_file, opt->verbose);
 
-                    if (output_is_connected(s)) {
-                        rc = output_write(s, server->id, server->name, server->addresses[n], server->lengths[n],
-                                          server->types[n], tab_reg, opt->verbose);
+                    if (output_is_connected(output_socket)) {
+                        rc = output_write(output_socket, server->id, server->name, server->addresses[n],
+                                          server->lengths[n], server->types[n], tab_reg, opt->verbose);
                         if (rc == -1) {
-                            output_close(s);
-                            s = -1;
+                            output_close(output_socket);
+                            output_socket = -1;
                         }
                     }
                 }
             }
         }
     }
-    output_close(s);
+    output_close(output_socket);
 }
 
 int main(int argc, char *argv[])
@@ -196,6 +204,7 @@ reload:
     signal(SIGINT, sigint_stop);
     signal(SIGHUP, sighup_reload);
 
+    /* Backend set by default if not defined */
     if (opt->backend == OPT_BACKEND_RTU) {
         ctx = modbus_new_rtu(opt->device, opt->baud, opt->parity[0], opt->data_bit, opt->stop_bit);
         if (ctx == NULL) {
@@ -203,21 +212,33 @@ reload:
             rc = -1;
             goto quit;
         }
+        modbus_set_debug(ctx, opt->verbose);
+        if (modbus_connect(ctx) == -1) {
+            goto quit;
+        }
     } else {
+        /* TCP */
+        ctx = modbus_new_tcp(opt->ip, opt->port);
+        modbus_set_debug(ctx, opt->verbose);
 
+        if (opt->mode == OPT_MODE_SERVER) {
+            /* Listen client */
+            socket = modbus_tcp_listen(ctx, 5);
+            modbus_tcp_accept(ctx, &socket);
+        } else {
+            /* Connect on server */
+            if (modbus_connect(ctx) == -1)
+                goto quit;
+        }
     }
 
-    modbus_set_debug(ctx, opt->verbose);
-    if (modbus_connect(ctx) == -1) {
-        goto quit;
-    }
 
-    if (opt->mode == OPT_MODE_SLAVE) {
+    if (opt->mode == OPT_MODE_SLAVE || opt->mode == OPT_MODE_SERVER) {
         if (opt->verbose) {
-            g_print("Running in slave mode\n");
+            g_print("Running in slave/server mode\n");
         }
         /* Set global var for sigint */
-        opt_mode = OPT_MODE_SLAVE;
+        opt_mode = opt->mode;
         collect_listen(opt);
     } else {
         collect_poll(opt, nb_server, servers);
@@ -226,6 +247,11 @@ reload:
 quit:
     if (opt->daemon) {
         pid_file_delete(opt->pid_file);
+    }
+
+    if (opt->backend == OPT_BACKEND_TCP) {
+        close(socket);
+        socket = 0;
     }
 
     modbus_close(ctx);

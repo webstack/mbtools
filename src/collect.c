@@ -5,6 +5,9 @@
 #include <string.h>
 #include <errno.h>
 #include <modbus.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "daemon.h"
 #include "chrono.h"
@@ -22,7 +25,7 @@ static volatile gboolean reload = FALSE;
 /* Required to stop server */
 static int opt_mode = OPT_MODE_MASTER;
 static modbus_t *ctx = NULL;
-static int socket = 0;
+static int server_socket = 0;
 
 static void sigint_stop(int dummy)
 {
@@ -32,8 +35,8 @@ static void sigint_stop(int dummy)
         /* Rude way to stop server */
         modbus_close(ctx);
     } else if (opt_mode == OPT_MODE_SERVER) {
-        close(socket);
-        socket = 0;
+        close(server_socket);
+        server_socket = 0;
     }
 }
 
@@ -43,21 +46,51 @@ static void sighup_reload(int dummy)
     reload = TRUE;
 }
 
-static int collect_listen(option_t *opt)
+static gboolean collect_listen_output(option_t *opt, modbus_mapping_t *mb_mapping, uint8_t *query, int header_length,
+                                      int *output_socket)
+{
+    /* Write multiple registers and single register */
+    if (query[header_length] == 0x10 || query[header_length] == 0x6) {
+        int rc;
+        int addr = MODBUS_GET_INT16_FROM_INT8(query, header_length + 1);
+        int nb = 1;
+
+        if (query[header_length] == 0x10)
+            nb = MODBUS_GET_INT16_FROM_INT8(query, header_length + 3);
+
+        /* Write to local unix socket */
+        if (opt->verbose)
+            g_print("Addr %d: %d values\n", addr, nb);
+
+        if (!output_is_connected(*output_socket))
+            *output_socket = output_connect(opt->socket_file, opt->verbose);
+
+        if (output_is_connected(*output_socket)) {
+            rc = output_write(*output_socket, -1, NULL, addr, nb, NULL, mb_mapping->tab_registers + addr, opt->verbose);
+            if (rc == -1) {
+                output_close(*output_socket);
+                *output_socket = -1;
+            }
+        }
+        return TRUE;
+    } else {
+        return FALSE;
+    }
+}
+
+static int collect_listen_rtu(option_t *opt)
 {
     modbus_mapping_t *mb_mapping = NULL;
     uint8_t query[MODBUS_RTU_MAX_ADU_LENGTH];
-    int s = 0;
+    int output_socket = 0;
     int header_length = modbus_get_header_length(ctx);
+
+    modbus_set_slave(ctx, opt->id);
 
     mb_mapping = modbus_mapping_new(BITS_NB, INPUT_BITS_NB, REGISTERS_NB, INPUT_REGISTERS_NB);
     if (mb_mapping == NULL) {
         fprintf(stderr, "Failed to allocate the mapping: %s\n", modbus_strerror(errno));
         return -1;
-    }
-
-    if (opt->backend == OPT_BACKEND_RTU) {
-        modbus_set_slave(ctx, opt->id);
     }
 
     while (!stop) {
@@ -66,25 +99,104 @@ static int collect_listen(option_t *opt)
         rc = modbus_receive(ctx, query);
         if (rc > 0) {
             modbus_reply(ctx, query, rc, mb_mapping);
-            /* Write multiple registers and single register */
-            if (query[header_length] == 0x10 || query[header_length] == 0x6) {
-                int addr = MODBUS_GET_INT16_FROM_INT8(query, header_length + 1);
-                int nb = 1;
+            collect_listen_output(opt, mb_mapping, query, header_length, &output_socket);
+        }
+    }
 
-                if (query[header_length] == 0x10)
-                    nb = MODBUS_GET_INT16_FROM_INT8(query, header_length + 3);
+    modbus_mapping_free(mb_mapping);
+    output_close(output_socket);
 
-                /* Write to local unix socket */
-                if (opt->verbose)
-                    g_print("Addr %d: %d values\n", addr, nb);
+    return 0;
+}
 
-                if (!output_is_connected(s))
-                    s = output_connect(opt->socket_file, opt->verbose);
+static int collect_listen_tcp(option_t *opt)
+{
+    modbus_mapping_t *mb_mapping = NULL;
+    uint8_t query[MODBUS_TCP_MAX_ADU_LENGTH];
+    int output_socket = 0;
+    int header_length = modbus_get_header_length(ctx);
 
-                if (output_is_connected(s)) {
-                    if (output_write(s, -1, NULL, addr, nb, NULL, mb_mapping->tab_registers + addr, opt->verbose) == -1) {
-                        output_close(s);
-                        s = -1;
+    int master_socket;
+    fd_set refset;
+    fd_set rdset;
+    int fdmax;
+
+    mb_mapping = modbus_mapping_new(BITS_NB, INPUT_BITS_NB, REGISTERS_NB, INPUT_REGISTERS_NB);
+    if (mb_mapping == NULL) {
+        fprintf(stderr, "Failed to allocate the mapping: %s\n", modbus_strerror(errno));
+        return -1;
+    }
+
+    /* Listen client */
+    server_socket = modbus_tcp_listen(ctx, 5);
+
+    /* Clear the reference set of socket */
+    FD_ZERO(&refset);
+    /* Add the server socket */
+    FD_SET(server_socket, &refset);
+
+    /* Keep track of the max file descriptor */
+    fdmax = server_socket;
+
+    while (!stop) {
+        rdset = refset;
+        if (select(fdmax+1, &rdset, NULL, NULL, NULL) == -1) {
+            perror("Server select() failure.");
+            stop = 1;
+            break;
+        }
+
+        /* Run through the existing connections looking for data to be read */
+        for (master_socket = 0; master_socket <= fdmax; master_socket++) {
+            if (!FD_ISSET(master_socket, &rdset)) {
+                continue;
+            }
+
+            if (master_socket == server_socket) {
+                /* A client is asking a new connection */
+                socklen_t addrlen;
+                struct sockaddr_in clientaddr;
+                int newfd;
+
+                /* Handle new connections */
+                addrlen = sizeof(clientaddr);
+                memset(&clientaddr, 0, sizeof(clientaddr));
+                newfd = accept(server_socket, (struct sockaddr *)&clientaddr, &addrlen);
+                if (newfd == -1) {
+                    perror("Server accept() error");
+                } else {
+                    FD_SET(newfd, &refset);
+
+                    if (newfd > fdmax) {
+                        /* Keep track of the maximum */
+                        fdmax = newfd;
+                    }
+                    if (opt->verbose) {
+                        g_print("New connection from %s:%d on socket %d\n",
+                                inet_ntoa(clientaddr.sin_addr), clientaddr.sin_port, newfd);
+                    }
+                }
+            } else {
+                int rc;
+
+                modbus_set_socket(ctx, master_socket);
+                rc = modbus_receive(ctx, query);
+                if (rc > 0) {
+                    modbus_reply(ctx, query, rc, mb_mapping);
+                    collect_listen_output(opt, mb_mapping, query, header_length, &output_socket);
+                } else if (rc == -1) {
+                    /* This example server in ended on connection closing or
+                     * any errors. */
+                    if (opt->verbose) {
+                        g_print("Connection closed on socket %d\n", master_socket);
+                    }
+                    close(master_socket);
+
+                    /* Remove from reference set */
+                    FD_CLR(master_socket, &refset);
+
+                    if (master_socket == fdmax) {
+                        fdmax--;
                     }
                 }
             }
@@ -92,7 +204,7 @@ static int collect_listen(option_t *opt)
     }
 
     modbus_mapping_free(mb_mapping);
-    output_close(s);
+    output_close(output_socket);
 
     return 0;
 }
@@ -207,41 +319,48 @@ reload:
     /* Backend set by default if not defined */
     if (opt->backend == OPT_BACKEND_RTU) {
         ctx = modbus_new_rtu(opt->device, opt->baud, opt->parity[0], opt->data_bit, opt->stop_bit);
-        if (ctx == NULL) {
-            fprintf(stderr, "Modbus init error\n");
-            rc = -1;
-            goto quit;
-        }
-        modbus_set_debug(ctx, opt->verbose);
-        if (modbus_connect(ctx) == -1) {
-            goto quit;
-        }
     } else {
         /* TCP */
         ctx = modbus_new_tcp(opt->ip, opt->port);
-        modbus_set_debug(ctx, opt->verbose);
-
-        if (opt->mode == OPT_MODE_SERVER) {
-            /* Listen client */
-            socket = modbus_tcp_listen(ctx, 5);
-            modbus_tcp_accept(ctx, &socket);
-        } else {
-            /* Connect on server */
-            if (modbus_connect(ctx) == -1)
-                goto quit;
-        }
     }
 
+    if (ctx == NULL) {
+        fprintf(stderr, "Modbus init error\n");
+        rc = -1;
+        goto quit;
+    }
 
-    if (opt->mode == OPT_MODE_SLAVE || opt->mode == OPT_MODE_SERVER) {
-        if (opt->verbose) {
-            g_print("Running in slave/server mode\n");
-        }
-        /* Set global var for sigint */
-        opt_mode = opt->mode;
-        collect_listen(opt);
-    } else {
-        collect_poll(opt, nb_server, servers);
+    modbus_set_debug(ctx, opt->verbose);
+
+    if (opt->mode == OPT_MODE_SLAVE ||
+        opt->mode == OPT_MODE_MASTER ||
+        opt->mode == OPT_MODE_CLIENT) {
+        if (modbus_connect(ctx) == -1)
+            goto quit;
+    }
+
+    /* Set global var for sigint */
+    opt_mode = opt->mode;
+
+    /* Main loop */
+    switch (opt->mode) {
+        case OPT_MODE_SLAVE:
+            if (opt->verbose) {
+                g_print("Running in slave mode\n");
+            }
+            collect_listen_rtu(opt);
+            break;
+        case OPT_MODE_SERVER:
+            if (opt->verbose) {
+                g_print("Running in server mode\n");
+            }
+            collect_listen_tcp(opt);
+            break;
+        case OPT_MODE_MASTER:
+            collect_poll(opt, nb_server, servers);
+            break;
+        default:
+            break;
     }
 
 quit:
@@ -250,8 +369,8 @@ quit:
     }
 
     if (opt->backend == OPT_BACKEND_TCP) {
-        close(socket);
-        socket = 0;
+        close(server_socket);
+        server_socket = 0;
     }
 
     modbus_close(ctx);

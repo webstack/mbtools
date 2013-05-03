@@ -120,5 +120,6 @@ class ServerTestCase(SlaveTestCase):
         self.col = Popen(["../src/mbcollect", "-f", "server-test-case.ini"], stdout=PIPE)
         self.uts = Popen(["./unit-test-client", "tcp"], stdout=PIPE, stderr=PIPE)
 
+
 if __name__ == '__main__':
     unittest.main()

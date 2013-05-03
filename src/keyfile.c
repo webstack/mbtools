@@ -34,26 +34,24 @@ server_t* keyfile_parse(option_t *opt, int *nb_server)
         g_free(mode_string);
     }
 
-    if (opt->backend == OPT_BACKEND_RTU) {
-        keyfile_set_integer(key_file, "settings", "id", &(opt->id));
+    keyfile_set_integer(key_file, "settings", "id", &(opt->id));
 
-        if (opt->device == NULL)
-            opt->device = g_key_file_get_string(key_file, "settings", "device", NULL);
+    if (opt->device == NULL)
+        opt->device = g_key_file_get_string(key_file, "settings", "device", NULL);
 
-        keyfile_set_integer(key_file, "settings", "baud", &(opt->baud));
+    keyfile_set_integer(key_file, "settings", "baud", &(opt->baud));
 
-        if (opt->parity == NULL)
-            opt->parity = g_key_file_get_string(key_file, "settings", "parity", NULL);
+    if (opt->parity == NULL)
+        opt->parity = g_key_file_get_string(key_file, "settings", "parity", NULL);
 
-        keyfile_set_integer(key_file, "settings", "databit", &(opt->data_bit));
-        keyfile_set_integer(key_file, "settings", "stopbit", &(opt->stop_bit));
-        keyfile_set_integer(key_file, "settings", "interval", &(opt->interval));
-    } else if (opt->backend == OPT_BACKEND_TCP) {
-        if (opt->ip == NULL)
-            opt->ip = g_key_file_get_string(key_file, "settings", "ip", NULL);
+    keyfile_set_integer(key_file, "settings", "databit", &(opt->data_bit));
+    keyfile_set_integer(key_file, "settings", "stopbit", &(opt->stop_bit));
+    keyfile_set_integer(key_file, "settings", "interval", &(opt->interval));
 
-        keyfile_set_integer(key_file, "settings", "port", &(opt->port));
-    }
+    if (opt->ip == NULL)
+        opt->ip = g_key_file_get_string(key_file, "settings", "ip", NULL);
+
+    keyfile_set_integer(key_file, "settings", "port", &(opt->port));
 
     if (opt->socket_file == NULL)
         opt->socket_file = g_key_file_get_string(key_file, "settings", "socketfile", NULL);

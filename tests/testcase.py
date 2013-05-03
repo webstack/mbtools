@@ -109,5 +109,16 @@ class SlaveTestCase(unittest.TestCase):
         self.assertEqual(self.rec.stdout.readline(), "mb_1 5678|mb_2 9012\n")
 
 
+class ServerTestCase(SlaveTestCase):
+    """Inhrerits from SlaveTestCase test_recorder and tearDown"""
+
+    def setUp(self):
+        if os.path.exists("/tmp/mbsocket"):
+            os.unlink("/tmp/mbsocket")
+
+        self.rec = Popen(["../src/mbrecorder"], stdout=PIPE)
+        self.col = Popen(["../src/mbcollect", "-f", "server-test-case.ini"], stdout=PIPE)
+        self.uts = Popen(["./unit-test-client", "tcp"], stdout=PIPE, stderr=PIPE)
+
 if __name__ == '__main__':
     unittest.main()

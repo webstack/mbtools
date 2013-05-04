@@ -9,12 +9,23 @@
 #define MBT_ETC_INI_FILE ("/etc/" MBT_LOCAL_INI_FILE)
 
 typedef struct {
-    modbus_t *ctx;
+    /* RTU - Slave ID */
     int id;
+    /* TCP - IP address*/
+    char *ip;
+    /* TCP - Port number */
+    int port;
+    /* TCP - Modbus context */
+    modbus_t *ctx;
+    /* Name of host */
     char *name;
+    /* Number of addresses to read */
     int n;
+    /* List of addresses to read */
     int *addresses;
+    /* List of lengths to read at each address */
     int *lengths;
+    /* List of data types (int, floatmsb, floatlsb) at each address */
     char **types;
 } server_t;
 

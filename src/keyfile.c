@@ -65,18 +65,34 @@ server_t* keyfile_parse(option_t *opt, int *nb_server)
     if (opt->verbose == FALSE)
         opt->verbose = g_key_file_get_boolean(key_file, "settings", "verbose", NULL);
 
-    if (opt->mode == OPT_MODE_MASTER) {
+    if (opt->mode == OPT_MODE_MASTER || opt->mode == OPT_MODE_CLIENT) {
+        const char slave_name[] = "slave";
+        const char server_name[] = "server";
+        const size_t SLAVE_LENGTH = 5;
+        const size_t SERVER_LENGTH = 6;
+        const char *section_name;
+        size_t section_length;
         gchar** groups = g_key_file_get_groups(key_file, NULL);
+
+        if (opt->mode == OPT_MODE_MASTER) {
+            section_name = slave_name;
+            section_length = SLAVE_LENGTH;
+        } else {
+            section_name = server_name;
+            section_length = SERVER_LENGTH;
+        }
 
         /* Count [slave] sections to allocate servers */
         i = 0;
         while (groups[i] != NULL) {
-            if ((strncmp(groups[i++], "slave", 5) == 0)) {
+            if ((strncmp(groups[i++], section_name, section_length) == 0)) {
                 (*nb_server)++;
             }
         }
 
-        if ((*nb_server) > 0) {
+        if ((*nb_server) == 0) {
+            g_warning("No slaves or servers found!");
+        } else {
             int c;
 
             /* Allocate servers */
@@ -85,19 +101,33 @@ server_t* keyfile_parse(option_t *opt, int *nb_server)
             i = 0;
             c = 0;
             while (groups[i] != NULL) {
-                if ((strncmp(groups[i], "slave", 5) == 0)) {
+                if (strncmp(groups[i], section_name, section_length) == 0) {
                     gsize n_address;
                     gsize n_length;
                     gsize n_types;
 
-                    /* Returns 0 if not found */
-                    servers[c].id = g_key_file_get_integer(key_file, groups[i], "id", NULL);
+                    if (opt->mode == OPT_MODE_MASTER) {
+                        /* Returns 0 if not found */
+                        servers[c].id = g_key_file_get_integer(key_file, groups[i], "id", NULL);
+                    } else {
+                        servers[c].ip = g_key_file_get_string(key_file, groups[i], "ip", NULL);
+                        if (servers[c].ip == NULL)
+                            servers[c].ip = g_strdup("127.0.0.1");
 
-                    /* 'slave' + space + " + ... + " */
-                    if (strlen(groups[i]) > 8)
-                        servers[c].name = g_strndup(groups[i] + 7, strlen(groups[i]) - 8);
-                    else
+                        servers[c].port = g_key_file_get_integer(key_file, groups[i], "port", NULL);
+                        if (servers[c].port == 0)
+                            servers[c].port = 502;
+                    }
+
+                    /* 'slave'/'server' + space + " + ... + " */
+                    if (strlen(groups[i]) > section_length + 3) {
+                        servers[c].name = g_strndup(groups[i] + section_length + 2,
+                                                    strlen(groups[i]) - section_length - 3);
+                    } else if (opt->mode == OPT_MODE_MASTER) {
                         servers[c].name = g_strdup_printf("%d", servers[c].id);
+                    } else {
+                        servers[c].name = g_strdup_printf("%s:%d", servers[c].ip, servers[c].port);
+                    }
 
                     servers[c].addresses = g_key_file_get_integer_list(key_file, groups[i], "addresses",
                                                                        &n_address, NULL);
@@ -115,6 +145,8 @@ server_t* keyfile_parse(option_t *opt, int *nb_server)
                         g_error("Not same number of addresses (%zd) and types (%zd)", n_address, n_length);
                     }
 
+                    /* Used by TCP client */
+                    servers[c].ctx = NULL;
 
                     /* FIXME Check mutliple of two for float types */
 
@@ -122,7 +154,11 @@ server_t* keyfile_parse(option_t *opt, int *nb_server)
                     if (opt->verbose) {
                         int n;
 
-                        g_print("Name %s, ID %d\n", servers[c].name, servers[c].id);
+                        if (opt->mode == OPT_MODE_MASTER) {
+                            g_print("Slave name %s, ID %d\n", servers[c].name, servers[c].id);
+                        } else {
+                            g_print("Server name %s, IP %s:%d\n", servers[c].name, servers[c].ip, servers[c].port);
+                        }
                         for (n=0; n < servers[c].n; n++) {
                             g_print("Address %d => %d values", servers[c].addresses[n], servers[c].lengths[n]);
                             if (servers[c].types != NULL) {
@@ -139,7 +175,6 @@ server_t* keyfile_parse(option_t *opt, int *nb_server)
         }
         g_strfreev(groups);
     }
-
     g_key_file_free(key_file);
 
     return servers;
@@ -152,9 +187,11 @@ void keyfile_server_free(int nb_server, server_t* servers)
     if (nb_server > 0) {
         for (i=0; i < nb_server; i++) {
             g_free(servers[i].name);
+            g_free(servers[i].ip);
             g_free(servers[i].addresses);
             g_free(servers[i].lengths);
             g_strfreev(servers[i].types);
+            /* ctx is freed by the function which creates it */
         }
         g_slice_free1(sizeof(server_t) * nb_server, servers);
     }

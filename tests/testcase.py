@@ -13,9 +13,10 @@ class MasterTestCase(unittest.TestCase):
         if os.path.exists("/tmp/mbsocket"):
             os.unlink("/tmp/mbsocket")
 
-        self.uts = Popen("./unit-test-server", stdout=PIPE, stderr=PIPE)
+        self.uts = Popen(["./unit-test-server", "rtu"], stdout=PIPE, stderr=PIPE)
         self.rec = Popen(["../src/mbrecorder"], stdout=PIPE)
         self.col = Popen(["../src/mbcollect", "-f", "master-test-case.ini"], stdout=PIPE)
+        self.is_master = True
 
     def tearDown(self):
         self.col.send_signal(signal.SIGTERM)
@@ -29,10 +30,16 @@ class MasterTestCase(unittest.TestCase):
         # MBCOLLECT
         # First line contains host name
         line = self.col.stdout.readline()
-        m = re.match("Name (\w+), ID (\d+)", line)
+        if self.is_master:
+            m = re.search("Slave name (\w+), ID (\d+)", line)
+            self.assertEqual(m.group(2), "1")
+        else:
+            m = re.search("Server name (\w+), IP ([\.\d]+):(\d+)", line)
+            self.assertEqual(m.group(2), "127.0.0.1")
+            self.assertEqual(m.group(3), "1502")
+
         server_name = m.group(1)
         self.assertEqual(server_name, "hello")
-        self.assertEqual(m.group(2), "1")
 
         # Check parsing of values to read
         c = re.compile("Address (\d+) => (\d+) values \((\w+)\)")
@@ -51,8 +58,11 @@ class MasterTestCase(unittest.TestCase):
             self.assertEqual(m.group(2), str(d['l']))
             self.assertEqual(m.group(3), d['type'])
 
-        self.assertEqual(self.col.stdout.readline(),
-            "Opening /dev/ttyUSB0 at 115200 bauds (N, 8, 1)\n")
+        line = self.col.stdout.readline()
+        if self.is_master:
+            self.assertEqual(line, "Opening /dev/ttyUSB0 at 115200 bauds (N, 8, 1)\n")
+        else:
+            self.assertEqual(line, "Connecting to 127.0.0.1:1502\n")
 
         # MBRECORDER
         # Ignore remaining output for collector and check recorder
@@ -83,6 +93,18 @@ class MasterTestCase(unittest.TestCase):
                     self.assertEqual(m.group(3), '\n')
 
                 start = m.end()
+
+
+class ClientTestCase(MasterTestCase):
+
+    def setUp(self):
+        if os.path.exists("/tmp/mbsocket"):
+            os.unlink("/tmp/mbsocket")
+
+        self.uts = Popen(["./unit-test-server", "tcp"], stdout=PIPE, stderr=PIPE)
+        self.rec = Popen(["../src/mbrecorder"], stdout=PIPE)
+        self.col = Popen(["../src/mbcollect", "-f", "client-test-case.ini"], stdout=PIPE)
+        self.is_master = False
 
 
 class SlaveTestCase(unittest.TestCase):

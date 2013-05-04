@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <signal.h>
+#include <string.h>
 
 #include <modbus.h>
 
@@ -41,19 +42,46 @@ static void signal_handler(int dummy)
     exit(dummy);
 }
 
+enum {
+    TCP,
+    RTU
+};
+
 int main(int argc, char *argv[])
 {
     int i;
+    int use_backend;
+    int port;
 
-    if (argc == 1) {
+    if (argc > 1) {
+        if (strcmp(argv[1], "tcp") == 0) {
+            use_backend = TCP;
+        } else if (strcmp(argv[1], "rtu") == 0) {
+            use_backend = RTU;
+        } else {
+            printf("Usage:\n  %s [tcp|rtu] [port] - Modbus server for unit testing\n\n", argv[0]);
+            exit(1);
+        }
+    } else {
+        /* By default */
+        use_backend = TCP;
+    }
+
+    if (use_backend == RTU) {
         ctx = modbus_new_rtu("/dev/ttyUSB1", 115200, 'N', 8, 1);
         modbus_set_debug(ctx, TRUE);
         modbus_set_slave(ctx, 1);
         modbus_connect(ctx);
     } else {
-        ctx = modbus_new_tcp("127.0.0.1", 1502);
+        if (argc > 2) {
+            port = atoi(argv[2]);
+        } else {
+            port = 1502;
+        }
+
+        ctx = modbus_new_tcp("127.0.0.1", port);
         modbus_set_debug(ctx, TRUE);
-        printf("Listen on 127.0.0.1:1502\n");
+        printf("Listen on 127.0.0.1:%d\n", port);
         socket = modbus_tcp_listen(ctx, 5);
         modbus_tcp_accept(ctx, &socket);
     }

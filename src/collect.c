@@ -32,7 +32,7 @@ static void sigint_stop(int dummy)
     /* Stop the main process */
     stop = TRUE;
     if (opt_mode == OPT_MODE_SLAVE) {
-        /* Rude way to stop server */
+        /* Rude way to stop server loop */
         modbus_close(ctx);
     } else if (opt_mode == OPT_MODE_SERVER) {
         close(server_socket);
@@ -80,22 +80,35 @@ static gboolean collect_listen_output(option_t *opt, modbus_mapping_t *mb_mappin
 
 static int collect_listen_rtu(option_t *opt)
 {
+    int rc;
     modbus_mapping_t *mb_mapping = NULL;
     uint8_t query[MODBUS_RTU_MAX_ADU_LENGTH];
     int output_socket = 0;
-    int header_length = modbus_get_header_length(ctx);
+    int header_length;
+
+    ctx = modbus_new_rtu(opt->device, opt->baud, opt->parity[0], opt->data_bit, opt->stop_bit);
+    if (ctx == NULL) {
+        g_warning("modbus_new_rtu: %s", modbus_strerror(errno));
+        return -1;
+    }
+
+    modbus_set_debug(ctx, opt->verbose);
+    rc = modbus_connect(ctx);
+    if (rc == -1) {
+        g_warning("modbus_connect: %s", modbus_strerror(errno));
+        return -1;
+    }
 
     modbus_set_slave(ctx, opt->id);
 
     mb_mapping = modbus_mapping_new(BITS_NB, INPUT_BITS_NB, REGISTERS_NB, INPUT_REGISTERS_NB);
     if (mb_mapping == NULL) {
-        fprintf(stderr, "Failed to allocate the mapping: %s\n", modbus_strerror(errno));
+        g_warning("modbus_mapping_new: %s", modbus_strerror(errno));
         return -1;
     }
 
+    header_length = modbus_get_header_length(ctx);
     while (!stop) {
-        int rc;
-
         rc = modbus_receive(ctx, query);
         if (rc > 0) {
             modbus_reply(ctx, query, rc, mb_mapping);
@@ -103,8 +116,10 @@ static int collect_listen_rtu(option_t *opt)
         }
     }
 
-    modbus_mapping_free(mb_mapping);
     output_close(output_socket);
+    modbus_mapping_free(mb_mapping);
+    modbus_close(ctx);
+    modbus_free(ctx);
 
     return 0;
 }
@@ -114,16 +129,24 @@ static int collect_listen_tcp(option_t *opt)
     modbus_mapping_t *mb_mapping = NULL;
     uint8_t query[MODBUS_TCP_MAX_ADU_LENGTH];
     int output_socket = 0;
-    int header_length = modbus_get_header_length(ctx);
+    int header_length;
 
     int master_socket;
     fd_set refset;
     fd_set rdset;
     int fdmax;
 
+    ctx = modbus_new_tcp(opt->ip, opt->port);
+    if (ctx == NULL) {
+        g_warning("modbus_new_tcp: %s", modbus_strerror(errno));
+        return -1;
+    }
+
+    modbus_set_debug(ctx, opt->verbose);
+
     mb_mapping = modbus_mapping_new(BITS_NB, INPUT_BITS_NB, REGISTERS_NB, INPUT_REGISTERS_NB);
     if (mb_mapping == NULL) {
-        fprintf(stderr, "Failed to allocate the mapping: %s\n", modbus_strerror(errno));
+        g_warning("modbus_mapping_new: %s", modbus_strerror(errno));
         return -1;
     }
 
@@ -135,9 +158,9 @@ static int collect_listen_tcp(option_t *opt)
     /* Add the server socket */
     FD_SET(server_socket, &refset);
 
+    header_length = modbus_get_header_length(ctx);
     /* Keep track of the max file descriptor */
     fdmax = server_socket;
-
     while (!stop) {
         rdset = refset;
         if (select(fdmax+1, &rdset, NULL, NULL, NULL) == -1) {
@@ -205,11 +228,14 @@ static int collect_listen_tcp(option_t *opt)
 
     modbus_mapping_free(mb_mapping);
     output_close(output_socket);
+    close(server_socket);
+    server_socket = 0;
+    modbus_free(ctx);
 
     return 0;
 }
 
-static void collect_poll(option_t *opt, int nb_server, server_t *servers)
+static int collect_poll(option_t *opt, int nb_server, server_t *servers)
 {
     int rc;
     int i;
@@ -217,6 +243,40 @@ static void collect_poll(option_t *opt, int nb_server, server_t *servers)
     uint16_t tab_reg[MODBUS_MAX_READ_REGISTERS];
     /* Local unix socket to output */
     int output_socket = 0;
+
+    if (opt->backend == OPT_BACKEND_RTU) {
+        ctx = modbus_new_rtu(opt->device, opt->baud, opt->parity[0], opt->data_bit, opt->stop_bit);
+        if (ctx == NULL) {
+            g_warning("modbus_new_rtu: %s", modbus_strerror(errno));
+            return -1;
+        }
+
+        modbus_set_debug(ctx, opt->verbose);
+
+        rc = modbus_connect(ctx);
+        if (rc == -1) {
+            g_warning("modbus_connect: %s", modbus_strerror(errno));
+            return -1;
+        }
+    } else {
+        /* TCP */
+        for (i = 0; i < nb_server; i++) {
+            server_t *server = &(servers[i]);
+            server->ctx = modbus_new_tcp(server->ip, server->port);
+            if (server->ctx == NULL) {
+                g_warning("modbus_new_tcp: %s", modbus_strerror(errno));
+                return -1;
+            }
+
+            modbus_set_debug(server->ctx, opt->verbose);
+
+            rc = modbus_connect(server->ctx);
+            if (rc == -1) {
+                g_warning("modbus_connect: %s", modbus_strerror(errno));
+                return -1;
+            }
+        }
+    }
 
     while (!stop) {
         GTimeVal tv;
@@ -243,10 +303,15 @@ static void collect_poll(option_t *opt, int nb_server, server_t *servers)
         for (i = 0; i < nb_server; i++) {
             server_t *server = &(servers[i]);
 
-            rc = modbus_set_slave(ctx, server->id);
-            if (rc != 0) {
-                g_warning("modbus_set_slave with ID %d: %s\n", server->id, modbus_strerror(errno));
-                continue;
+            if (opt->backend == OPT_BACKEND_RTU) {
+                rc = modbus_set_slave(ctx, server->id);
+                if (rc != 0) {
+                    g_warning("modbus_set_slave with ID %d: %s\n", server->id, modbus_strerror(errno));
+                    continue;
+                }
+            } else {
+                /* Set current context in TCP */
+                ctx = server->ctx;
             }
 
             for (n = 0; n < server->n; n++) {
@@ -275,7 +340,22 @@ static void collect_poll(option_t *opt, int nb_server, server_t *servers)
             }
         }
     }
+
     output_close(output_socket);
+
+    if (opt->backend == OPT_BACKEND_RTU) {
+        modbus_close(ctx);
+        modbus_free(ctx);
+    } else {
+        /* TCP */
+        for (i = 0; i < nb_server; i++) {
+            server_t *server = &(servers[i]);
+            modbus_close(server->ctx);
+            modbus_free(server->ctx);
+        }
+    }
+
+    return 0;
 }
 
 int main(int argc, char *argv[])
@@ -286,7 +366,6 @@ int main(int argc, char *argv[])
     server_t *servers = NULL;
 
 reload:
-
     /* Parse command line options */
     opt = option_new();
     option_parse(opt, argc, argv);
@@ -294,16 +373,14 @@ reload:
     /* Parse .ini file */
     servers = keyfile_parse(opt, &nb_server);
 
-    if (option_set_undefined(opt) == -1) {
-        goto quit;
-    }
+    option_set_undefined(opt);
 
     /* Launched as daemon */
     if (opt->daemon) {
         pid_t pid = fork();
         if (pid) {
             if (pid < 0) {
-                fprintf(stderr, "Failed to fork the main: %s\n", strerror(errno));
+                g_warning("Failed to fork the main: %s", modbus_strerror(errno));
             }
             _exit(0);
         }
@@ -315,29 +392,6 @@ reload:
     /* Signal */
     signal(SIGINT, sigint_stop);
     signal(SIGHUP, sighup_reload);
-
-    /* Backend set by default if not defined */
-    if (opt->backend == OPT_BACKEND_RTU) {
-        ctx = modbus_new_rtu(opt->device, opt->baud, opt->parity[0], opt->data_bit, opt->stop_bit);
-    } else {
-        /* TCP */
-        ctx = modbus_new_tcp(opt->ip, opt->port);
-    }
-
-    if (ctx == NULL) {
-        fprintf(stderr, "Modbus init error\n");
-        rc = -1;
-        goto quit;
-    }
-
-    modbus_set_debug(ctx, opt->verbose);
-
-    if (opt->mode == OPT_MODE_SLAVE ||
-        opt->mode == OPT_MODE_MASTER ||
-        opt->mode == OPT_MODE_CLIENT) {
-        if (modbus_connect(ctx) == -1)
-            goto quit;
-    }
 
     /* Set global var for sigint */
     opt_mode = opt->mode;
@@ -357,24 +411,16 @@ reload:
             collect_listen_tcp(opt);
             break;
         case OPT_MODE_MASTER:
+        case OPT_MODE_CLIENT:
             collect_poll(opt, nb_server, servers);
             break;
         default:
             break;
     }
 
-quit:
     if (opt->daemon) {
         pid_file_delete(opt->pid_file);
     }
-
-    if (opt->backend == OPT_BACKEND_TCP) {
-        close(server_socket);
-        server_socket = 0;
-    }
-
-    modbus_close(ctx);
-    modbus_free(ctx);
 
     keyfile_server_free(nb_server, servers);
     option_free(opt);

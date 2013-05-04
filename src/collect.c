@@ -273,11 +273,13 @@ static int collect_poll(option_t *opt, int nb_server, server_t *servers)
             }
 
             modbus_set_debug(server->ctx, opt->verbose);
+            modbus_set_error_recovery(server->ctx,
+                MODBUS_ERROR_RECOVERY_LINK | MODBUS_ERROR_RECOVERY_PROTOCOL);
 
             rc = modbus_connect(server->ctx);
             if (rc == -1) {
                 g_warning("modbus_connect: %s", modbus_strerror(errno));
-                return -1;
+                /* but continue */
             }
         }
     }

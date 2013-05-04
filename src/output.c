@@ -48,7 +48,7 @@ gboolean output_is_connected(int s)
     return s > 0 ? TRUE : FALSE;
 }
 
-int output_write(int s, int slave_id, char *name, int addr, int nb_reg, char *type, uint16_t *tab_reg, gboolean verbose)
+int output_write(int s, option_t *opt, char *name, int addr, int nb_reg, char *type, uint16_t *tab_reg, gboolean verbose)
 {
     int rc;
     int i, j;
@@ -58,8 +58,11 @@ int output_write(int s, int slave_id, char *name, int addr, int nb_reg, char *ty
     char **out_array = NULL;
     gboolean is_integer;
     gboolean is_lsb = FALSE;
+    gboolean is_server;
 
-    if (type == NULL || strcmp(type, "int") == 0) {
+    is_server = (opt->mode == OPT_MODE_SLAVE || opt->mode == OPT_MODE_SERVER);
+
+    if (is_server || strcmp(type, "int") == 0) {
         /* Integer */
         is_integer = TRUE;
         nb = nb_reg;
@@ -74,8 +77,8 @@ int output_write(int s, int slave_id, char *name, int addr, int nb_reg, char *ty
     out_array = g_new(char*, nb + 1);
 
     for (i = 0, j = 0; i < nb; i++) {
-        if (slave_id > 0) {
-            /* Type is only handled in this mode (master) */
+        if (!is_server) {
+            /* Type is only handled in this mode */
             if (is_integer) {
                 out_array[i] = g_strdup_printf("mb_%s_%d %d|", name, addr + i, tab_reg[i]);
             } else {

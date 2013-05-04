@@ -25,7 +25,7 @@ static volatile gboolean reload = FALSE;
 /* Required to stop server */
 static int opt_mode = OPT_MODE_MASTER;
 static modbus_t *ctx = NULL;
-static int server_socket = 0;
+static int server_socket = -1;
 
 static void sigint_stop(int dummy)
 {
@@ -36,7 +36,7 @@ static void sigint_stop(int dummy)
         modbus_close(ctx);
     } else if (opt_mode == OPT_MODE_SERVER) {
         close(server_socket);
-        server_socket = 0;
+        server_socket = -1;
     }
 }
 
@@ -66,7 +66,7 @@ static gboolean collect_listen_output(option_t *opt, modbus_mapping_t *mb_mappin
             *output_socket = output_connect(opt->socket_file, opt->verbose);
 
         if (output_is_connected(*output_socket)) {
-            rc = output_write(*output_socket, -1, NULL, addr, nb, NULL, mb_mapping->tab_registers + addr, opt->verbose);
+            rc = output_write(*output_socket, opt, NULL, addr, nb, NULL, mb_mapping->tab_registers + addr, opt->verbose);
             if (rc == -1) {
                 output_close(*output_socket);
                 *output_socket = -1;
@@ -152,6 +152,10 @@ static int collect_listen_tcp(option_t *opt)
 
     /* Listen client */
     server_socket = modbus_tcp_listen(ctx, 5);
+    if (server_socket == -1) {
+        g_warning("modbus_tcp_listen: %s", modbus_strerror(errno));
+        return -1;
+    }
 
     /* Clear the reference set of socket */
     FD_ZERO(&refset);
@@ -229,7 +233,7 @@ static int collect_listen_tcp(option_t *opt)
     modbus_mapping_free(mb_mapping);
     output_close(output_socket);
     close(server_socket);
-    server_socket = 0;
+    server_socket = -1;
     modbus_free(ctx);
 
     return 0;
@@ -316,12 +320,12 @@ static int collect_poll(option_t *opt, int nb_server, server_t *servers)
 
             for (n = 0; n < server->n; n++) {
                 if (opt->verbose) {
-                    g_print("ID: %d, addr:%d l:%d\n", server->id, server->addresses[n], server->lengths[n]);
+                    g_print("Name: %s, addr:%d l:%d\n", server->name, server->addresses[n], server->lengths[n]);
                 }
 
                 rc = modbus_read_registers(ctx, server->addresses[n], server->lengths[n], tab_reg);
                 if (rc == -1) {
-                    g_warning("ID: %d, addr:%d l:%d %s\n", server->id, server->addresses[n], server->lengths[n],
+                    g_warning("Name: %s, addr:%d l:%d %s\n", server->name, server->addresses[n], server->lengths[n],
                               modbus_strerror(errno));
                 } else {
                     /* Write to local unix socket */
@@ -329,7 +333,7 @@ static int collect_poll(option_t *opt, int nb_server, server_t *servers)
                         output_socket = output_connect(opt->socket_file, opt->verbose);
 
                     if (output_is_connected(output_socket)) {
-                        rc = output_write(output_socket, server->id, server->name, server->addresses[n],
+                        rc = output_write(output_socket, opt, server->name, server->addresses[n],
                                           server->lengths[n], server->types[n], tab_reg, opt->verbose);
                         if (rc == -1) {
                             output_close(output_socket);

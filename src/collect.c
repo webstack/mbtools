@@ -131,7 +131,6 @@ static int collect_listen_tcp(option_t *opt)
     int output_socket = 0;
     int header_length;
 
-    int master_socket;
     fd_set refset;
     fd_set rdset;
     int fdmax;
@@ -166,6 +165,8 @@ static int collect_listen_tcp(option_t *opt)
     /* Keep track of the max file descriptor */
     fdmax = server_socket;
     while (!stop) {
+        int s;
+
         rdset = refset;
         if (select(fdmax+1, &rdset, NULL, NULL, NULL) == -1) {
             perror("Server select() failure.");
@@ -174,12 +175,11 @@ static int collect_listen_tcp(option_t *opt)
         }
 
         /* Run through the existing connections looking for data to be read */
-        for (master_socket = 0; master_socket <= fdmax; master_socket++) {
-            if (!FD_ISSET(master_socket, &rdset)) {
+        for (s = 0; s <= fdmax; s++) {
+            if (!FD_ISSET(s, &rdset)) {
                 continue;
             }
-
-            if (master_socket == server_socket) {
+            if (s == server_socket) {
                 /* A client is asking a new connection */
                 socklen_t addrlen;
                 struct sockaddr_in clientaddr;
@@ -190,7 +190,7 @@ static int collect_listen_tcp(option_t *opt)
                 memset(&clientaddr, 0, sizeof(clientaddr));
                 newfd = accept(server_socket, (struct sockaddr *)&clientaddr, &addrlen);
                 if (newfd == -1) {
-                    perror("Server accept() error");
+                    perror("accept() error");
                 } else {
                     FD_SET(newfd, &refset);
 
@@ -206,7 +206,7 @@ static int collect_listen_tcp(option_t *opt)
             } else {
                 int rc;
 
-                modbus_set_socket(ctx, master_socket);
+                modbus_set_socket(ctx, s);
                 rc = modbus_receive(ctx, query);
                 if (rc > 0) {
                     modbus_reply(ctx, query, rc, mb_mapping);
@@ -215,14 +215,14 @@ static int collect_listen_tcp(option_t *opt)
                     /* This example server in ended on connection closing or
                      * any errors. */
                     if (opt->verbose) {
-                        g_print("Connection closed on socket %d\n", master_socket);
+                        g_print("Connection closed on socket %d\n", s);
                     }
-                    close(master_socket);
+                    close(s);
 
                     /* Remove from reference set */
-                    FD_CLR(master_socket, &refset);
+                    FD_CLR(s, &refset);
 
-                    if (master_socket == fdmax) {
+                    if (s == fdmax) {
                         fdmax--;
                     }
                 }

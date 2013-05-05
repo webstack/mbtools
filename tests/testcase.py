@@ -20,6 +20,14 @@ class CommonMSTestCase(unittest.TestCase):
             {'a': 4, 'l': 3, 'type': 'int', 'values': ['1', '2', '3']},
         ]
 
+    def tearDown(self):
+        self.col.send_signal(signal.SIGTERM)
+        self.rec.send_signal(signal.SIGTERM)
+        self.uts.send_signal(signal.SIGTERM)
+        self.col.wait()
+        self.rec.wait()
+        self.uts.wait()
+
     def check_parsing(self, process):
         # Check parsing of values to read
         c = re.compile("Address (\d+) => (\d+) values \((\w+)\)")
@@ -72,14 +80,6 @@ class MasterTestCase(CommonMSTestCase):
         self.uts = Popen(["./unit-test-server", "rtu"], stdout=PIPE, stderr=PIPE)
         self.rec = Popen(["../src/mbrecorder"], stdout=PIPE)
         self.col = Popen(["../src/mbcollect", "-f", "master-test-case.ini"], stdout=PIPE)
-
-    def tearDown(self):
-        self.col.send_signal(signal.SIGTERM)
-        self.rec.send_signal(signal.SIGTERM)
-        self.uts.send_signal(signal.SIGTERM)
-        self.col.wait()
-        self.rec.wait()
-        self.uts.wait()
 
     def test_output(self):
         line = self.col.stdout.readline()

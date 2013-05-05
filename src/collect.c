@@ -168,10 +168,13 @@ static int collect_listen_tcp(option_t *opt)
         int s;
 
         rdset = refset;
+
         if (select(fdmax+1, &rdset, NULL, NULL, NULL) == -1) {
-            perror("Server select() failure.");
+            perror("select() failure.");
+            /* If stop is set to 1 by signal handling, the program will exit
+               but I think it's safer to do that in all cases. */
             stop = 1;
-            break;
+            continue;
         }
 
         /* Run through the existing connections looking for data to be read */

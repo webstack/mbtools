@@ -4,7 +4,6 @@ from subprocess import Popen, PIPE
 import os
 import re
 import signal
-import time
 import unittest
 
 
@@ -133,8 +132,6 @@ class SlaveTestCase(unittest.TestCase):
 
         self.rec = Popen(["../src/mbrecorder"], stdout=PIPE)
         self.col = Popen(["../src/mbcollect", "-f", "slave-test-case.ini"], stdout=PIPE)
-        # Be sure client doesn't quit because server is not ready yet
-        time.sleep(0.5)
         self.uts = Popen(["./unit-test-client", "rtu"], stdout=PIPE, stderr=PIPE)
 
     def tearDown(self):
@@ -161,7 +158,6 @@ class ServerTestCase(SlaveTestCase):
 
         self.rec = Popen(["../src/mbrecorder"], stdout=PIPE)
         self.col = Popen(["../src/mbcollect", "-f", "server-test-case.ini"], stdout=PIPE)
-        time.sleep(0.5)
         self.uts = Popen(["./unit-test-client", "tcp"], stdout=PIPE, stderr=PIPE)
 
 

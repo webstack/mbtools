@@ -12,13 +12,14 @@
 #define SOCK_PATH "/tmp/mbsocket"
 
 static volatile int stop = 0;
-static volatile int s = 0;
+static volatile int s = -1;
 
 static void sigint_stop(int dummy)
 {
     /* Stop the main process */
     stop = 1;
     close(s);
+    s = -1;
 }
 
 int main(int argc, char **argv)
@@ -73,11 +74,14 @@ int main(int argc, char **argv)
         msgsock = -1;
     }
 
-    if (msgsock != -1)
+    if (msgsock != -1) {
         close(msgsock);
+    }
 
     /* Close socket first to not wait locked file */
-    close(s);
+    if (s != -1) {
+        close(s);
+    }
     unlink(server.sun_path);
 
     return 0;

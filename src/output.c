@@ -38,9 +38,12 @@ int output_connect(char* socket_file, gboolean verbose)
     return s;
 }
 
-void output_close(int s)
+void output_close(int *s)
 {
-    close(s);
+    if (*s != -1) {
+        close(*s);
+        *s = -1;
+    }
 }
 
 gboolean output_is_connected(int s)

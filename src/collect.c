@@ -68,8 +68,7 @@ static gboolean collect_listen_output(option_t *opt, modbus_mapping_t *mb_mappin
         if (output_is_connected(*output_socket)) {
             rc = output_write(*output_socket, opt, NULL, addr, nb, NULL, mb_mapping->tab_registers + addr, opt->verbose);
             if (rc == -1) {
-                output_close(*output_socket);
-                *output_socket = -1;
+                output_close(output_socket);
             }
         }
         return TRUE;
@@ -83,7 +82,7 @@ static int collect_listen_rtu(option_t *opt)
     int rc;
     modbus_mapping_t *mb_mapping = NULL;
     uint8_t query[MODBUS_RTU_MAX_ADU_LENGTH];
-    int output_socket = 0;
+    int output_socket = -1;
     int header_length;
 
     ctx = modbus_new_rtu(opt->device, opt->baud, opt->parity[0], opt->data_bit, opt->stop_bit);
@@ -116,7 +115,7 @@ static int collect_listen_rtu(option_t *opt)
         }
     }
 
-    output_close(output_socket);
+    output_close(&output_socket);
     modbus_mapping_free(mb_mapping);
     modbus_close(ctx);
     modbus_free(ctx);
@@ -128,7 +127,7 @@ static int collect_listen_tcp(option_t *opt)
 {
     modbus_mapping_t *mb_mapping = NULL;
     uint8_t query[MODBUS_TCP_MAX_ADU_LENGTH];
-    int output_socket = 0;
+    int output_socket = -1;
     int header_length;
 
     fd_set refset;
@@ -234,7 +233,7 @@ static int collect_listen_tcp(option_t *opt)
     }
 
     modbus_mapping_free(mb_mapping);
-    output_close(output_socket);
+    output_close(&output_socket);
     close(server_socket);
     server_socket = -1;
     modbus_free(ctx);
@@ -249,7 +248,7 @@ static int collect_poll(option_t *opt, int nb_server, server_t *servers)
     int n;
     uint16_t tab_reg[MODBUS_MAX_READ_REGISTERS];
     /* Local unix socket to output */
-    int output_socket = 0;
+    int output_socket = -1;
 
     if (opt->backend == OPT_BACKEND_RTU) {
         ctx = modbus_new_rtu(opt->device, opt->baud, opt->parity[0], opt->data_bit, opt->stop_bit);
@@ -355,8 +354,7 @@ static int collect_poll(option_t *opt, int nb_server, server_t *servers)
                         rc = output_write(output_socket, opt, server->name, server->addresses[n],
                                           server->lengths[n], server->types[n], tab_reg, opt->verbose);
                         if (rc == -1) {
-                            output_close(output_socket);
-                            output_socket = -1;
+                            output_close(&output_socket);
                         }
                     }
                 }
@@ -364,7 +362,7 @@ static int collect_poll(option_t *opt, int nb_server, server_t *servers)
         }
     }
 
-    output_close(output_socket);
+    output_close(&output_socket);
 
     if (opt->backend == OPT_BACKEND_RTU) {
         modbus_close(ctx);

@@ -27,6 +27,8 @@ typedef struct {
     int *lengths;
     /* List of data types (int, floatmsb, floatlsb) at each address */
     char **types;
+    /* Whether the server is connected */
+    gboolean connected;
 } server_t;
 
 server_t* keyfile_parse(option_t *opt, int *nb_server);

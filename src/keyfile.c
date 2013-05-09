@@ -147,6 +147,7 @@ server_t* keyfile_parse(option_t *opt, int *nb_server)
 
                     /* Used by TCP client */
                     servers[c].ctx = NULL;
+                    servers[c].connected = FALSE;
 
                     /* FIXME Check mutliple of two for float types */
 

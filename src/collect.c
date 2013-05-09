@@ -276,10 +276,10 @@ static int collect_poll(option_t *opt, int nb_server, server_t *servers)
             }
 
             modbus_set_debug(server->ctx, opt->verbose);
-            modbus_set_error_recovery(server->ctx,
-                MODBUS_ERROR_RECOVERY_LINK | MODBUS_ERROR_RECOVERY_PROTOCOL);
+            modbus_set_error_recovery(server->ctx, MODBUS_ERROR_RECOVERY_PROTOCOL);
 
             rc = modbus_connect(server->ctx);
+            server->connected = (rc == 0);
             if (rc == -1) {
                 g_warning("modbus_connect: %s", modbus_strerror(errno));
                 /* but continue */
@@ -323,7 +323,15 @@ static int collect_poll(option_t *opt, int nb_server, server_t *servers)
                 ctx = server->ctx;
             }
 
-            for (n = 0; n < server->n; n++) {
+            if (!server->connected) {
+                rc = modbus_connect(ctx);
+                server->connected = (rc == 0);
+                if (rc == -1) {
+                    g_warning("modbus_connect: %s", modbus_strerror(errno));
+                }
+            }
+
+            for (n = 0; n < server->n && server->connected; n++) {
                 if (opt->verbose) {
                     g_print("Name: %s, addr:%d l:%d\n", server->name, server->addresses[n], server->lengths[n]);
                 }
@@ -332,6 +340,12 @@ static int collect_poll(option_t *opt, int nb_server, server_t *servers)
                 if (rc == -1) {
                     g_warning("Name: %s, addr:%d l:%d %s\n", server->name, server->addresses[n], server->lengths[n],
                               modbus_strerror(errno));
+                    if (errno == EBADF || errno == ECONNRESET || errno == EPIPE) {
+                        modbus_close(ctx);
+                        server->connected = FALSE;
+                        /* Skip this server in this iteration */
+                    }
+                    /* Else MODBUS_ERROR_RECOVERY_PROTOCOL has already flushed the data, good! */
                 } else {
                     /* Write to local unix socket */
                     if (!output_is_connected(output_socket))

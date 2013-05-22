@@ -106,10 +106,10 @@ server_t* keyfile_parse(option_t *opt, int *nb_server)
                     gsize n_length;
                     gsize n_types;
 
-                    if (opt->mode == OPT_MODE_MASTER) {
-                        /* Returns 0 if not found */
-                        servers[c].id = g_key_file_get_integer(key_file, groups[i], "id", NULL);
-                    } else {
+                    /* Returns 0 if not found. The slave ID can be set in TCP client mode too. */
+                    servers[c].id = g_key_file_get_integer(key_file, groups[i], "id", NULL);
+
+                    if (opt->mode == OPT_MODE_CLIENT) {
                         servers[c].ip = g_key_file_get_string(key_file, groups[i], "ip", NULL);
                         if (servers[c].ip == NULL)
                             servers[c].ip = g_strdup("127.0.0.1");

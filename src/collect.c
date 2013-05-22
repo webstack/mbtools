@@ -277,6 +277,10 @@ static int collect_poll(option_t *opt, int nb_server, server_t *servers)
             modbus_set_debug(server->ctx, opt->verbose);
             modbus_set_error_recovery(server->ctx, MODBUS_ERROR_RECOVERY_PROTOCOL);
 
+            if (server->id) {
+                modbus_set_slave(server->ctx, server->id);
+            }
+
             rc = modbus_connect(server->ctx);
             server->connected = (rc == 0);
             if (rc == -1) {

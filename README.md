@@ -15,7 +15,7 @@ to act as client or server (in TCP or RTU):
 Requirements
 ------------
 
-automake libtool pkg-config libglib2.0-dev libmodbus
+automake libtool pkg-config libglib2.0-dev libmodbus >= v3.1.1
 
 Installation
 ------------

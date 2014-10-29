@@ -1,5 +1,8 @@
+mbtools
+=======
+
 Description
-===========
+-----------
 
 Modbus tools based on libmodbus to log data fetched by a master/client
 or received by a slave/server (writing of registers). mbcollect is able
@@ -10,12 +13,12 @@ to act as client or server (in TCP or RTU):
   register writes to a local Unix socket.
 
 Requirements
-============
+------------
 
 automake libtool pkg-config libglib2.0-dev libmodbus
 
 Installation
-============
+------------
 
     $ ./autogen.sh
     $ ./configure
@@ -23,7 +26,7 @@ Installation
 
 
 Testing
-=======
+-------
 
 To run the full suite of tests, you need to connect two USB-serial adapters on
 the same link. The tests assume there seen as ttyUSB0 and ttyUSB1.
@@ -40,7 +43,7 @@ To launch one test at once, you must specify the class of TestCase:
 
 
 Settings
-========
+--------
 
 The program mbcollect accepts many options from command line, all options from
 command line are also available in config .ini file. Some options related to
@@ -84,7 +87,7 @@ See *tests/* for a list of config file examples.
 
 
 Stop and reload
-===============
+---------------
 
 The programs are designed to handle SIGTERM to stop them. *mbcollect* is also
 able to reload its config file on SIGHUP signal.

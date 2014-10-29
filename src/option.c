@@ -129,6 +129,7 @@ opt_mode_t option_parse_mode(char *mode_string)
         return OPT_MODE_SERVER;
 
     g_error("invalid mode '%s'", mode_string);
+    return OPT_MODE_UNKNOWN;
 }
 
 /* Set mode and backend accordingly */

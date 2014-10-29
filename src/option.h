@@ -9,7 +9,8 @@ typedef enum {
     OPT_MODE_MASTER,
     OPT_MODE_SLAVE,
     OPT_MODE_CLIENT,
-    OPT_MODE_SERVER
+    OPT_MODE_SERVER,
+    OPT_MODE_UNKNOWN
 } opt_mode_t;
 
 typedef enum {

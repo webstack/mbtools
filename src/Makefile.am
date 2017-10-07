@@ -14,7 +14,7 @@ AM_CFLAGS = ${my_CFLAGS} \
 	-ffunction-sections \
 	-fdata-sections
 
-AM_LDFLAGS = ${MBTOOLS_LIBS} \
+AM_LDFLAGS = \
 	-Wl,--gc-sections \
 	-Wl,--as-needed
 
@@ -28,5 +28,9 @@ mbcollect_SOURCES = \
 	output.c \
 	collect.c
 
+mbcollect_LDADD = ${MBTOOLS_LIBS}
+
 mbrecorder_SOURCES = \
 	recorder.c
+
+mbrecorder_LDADD = ${MBTOOLS_LIBS}

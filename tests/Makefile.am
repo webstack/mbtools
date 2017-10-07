@@ -9,7 +9,7 @@ AM_CFLAGS = ${my_CFLAGS} \
     -ffunction-sections \
     -fdata-sections
 
-AM_LDFLAGS = ${MBTOOLS_LIBS} \
+AM_LDFLAGS = \
     -Wl,--gc-sections \
     -Wl,--as-needed
 
@@ -20,3 +20,5 @@ noinst_PROGRAMS = \
 unit_test_server_SOURCES = unit-test-server.c
 unit_test_client_SOURCES = unit-test-client.c
 
+unit_test_server_LDADD = ${MBTOOLS_LIBS} 
+unit_test_client_LDADD = ${MBTOOLS_LIBS} 
